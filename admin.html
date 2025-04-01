@@ -28,30 +28,33 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 10px;
+            padding: 15px;
             border-bottom: 1px solid #eee;
         }
         .domain-item:last-child {
             border-bottom: none;
         }
-        .domain-item .status {
-            padding: 5px 10px;
-            border-radius: 3px;
-            font-size: 14px;
-            margin-right: 10px;
+        .domain-info {
+            flex: 1;
         }
-        .status.active {
-            background: #e6f4ea;
+        .domain-url {
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        .domain-status {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .status-active {
+            background-color: #e6f4ea;
             color: #1e8e3e;
         }
-        .status.blocked {
-            background: #fce8e6;
+        .status-blocked {
+            background-color: #fce8e6;
             color: #d93025;
-        }
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin: 20px 0;
         }
         button {
             background-color: #4CAF50;
@@ -61,128 +64,106 @@
             border-radius: 5px;
             cursor: pointer;
             font-size: 14px;
+            margin-left: 10px;
         }
         button:hover {
-            background-color: #45a049;
+            opacity: 0.9;
         }
         button.block {
             background-color: #dc3545;
         }
-        button.block:hover {
-            background-color: #c82333;
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
         }
-        button.unblock {
-            background-color: #28a745;
+        .qr-link {
+            text-decoration: none;
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 14px;
         }
-        button.unblock:hover {
-            background-color: #218838;
-        }
-        .save-bar {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 15px;
-            text-align: center;
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-            display: none;
-        }
-        .save-bar.show {
-            display: block;
+        .qr-link:hover {
+            background-color: #0056b3;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>域名管理后台</h1>
-        
-        <div class="domain-list" id="domainList">
-            <!-- 域名列表将通过JavaScript动态添加 -->
+        <div class="header">
+            <h1>域名管理后台</h1>
+            <a href="index.html" class="qr-link">查看二维码</a>
         </div>
-
-        <div class="save-bar" id="saveBar">
-            <button onclick="saveChanges()">保存更改</button>
-            <button onclick="resetChanges()" style="background-color: #6c757d;">取消</button>
-        </div>
+        <div class="domain-list" id="domainList"></div>
     </div>
 
     <script>
-        const API_BASE_URL = 'http://localhost:5001/api';
-        
-        // 获取域名列表
-        async function getDomains() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/domains`);
-                const domains = await response.json();
-                return domains;
-            } catch (error) {
-                console.error('获取域名列表失败:', error);
-                return [];
-            }
+        // 从 localStorage 获取域名状态
+        function getDomainStatuses() {
+            const statuses = localStorage.getItem('domainStatuses');
+            return statuses ? JSON.parse(statuses) : {};
         }
 
-        // 更新域名状态
-        async function updateDomainStatus(domain, isActive) {
-            try {
-                const response = await fetch(`${API_BASE_URL}/domains/${domain}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        is_active: isActive,
-                        blocked_at: isActive ? null : new Date().toISOString()
-                    })
-                });
-                if (response.ok) {
-                    return true;
+        // 保存域名状态到 localStorage
+        function saveDomainStatuses(statuses) {
+            localStorage.setItem('domainStatuses', JSON.stringify(statuses));
+        }
+
+        // 初始化域名状态
+        function initializeDomainStatuses() {
+            const statuses = getDomainStatuses();
+            CONFIG.domains.forEach(domain => {
+                if (!(domain in statuses)) {
+                    statuses[domain] = true; // 默认启用
                 }
-                return false;
-            } catch (error) {
-                console.error('更新域名状态失败:', error);
-                return false;
-            }
+            });
+            saveDomainStatuses(statuses);
+            return statuses;
         }
 
-        // 初始化页面
-        async function initPage() {
-            const domains = await getDomains();
+        // 更新域名列表显示
+        function updateDomainList() {
+            const statuses = getDomainStatuses();
             const container = document.getElementById('domainList');
             container.innerHTML = '';
-            
-            domains.forEach(domain => {
-                const card = document.createElement('div');
-                card.className = 'domain-card';
-                card.innerHTML = `
+
+            CONFIG.domains.forEach(domain => {
+                const isActive = statuses[domain] !== false;
+                const item = document.createElement('div');
+                item.className = 'domain-item';
+                item.innerHTML = `
                     <div class="domain-info">
-                        <h3>${domain.domain}</h3>
-                        <p>状态: ${domain.is_active ? '启用' : '禁用'}</p>
-                        ${domain.blocked_at ? `<p>禁用时间: ${new Date(domain.blocked_at).toLocaleString()}</p>` : ''}
+                        <div class="domain-url">
+                            ${domain}
+                            <span class="domain-status ${isActive ? 'status-active' : 'status-blocked'}">
+                                ${isActive ? '正常' : '已禁用'}
+                            </span>
+                        </div>
                     </div>
-                    <div class="domain-actions">
-                        <button onclick="toggleDomain('${domain.domain}', ${!domain.is_active})" 
-                                class="${domain.is_active ? 'disable-btn' : 'enable-btn'}">
-                            ${domain.is_active ? '禁用' : '启用'}
-                        </button>
-                    </div>
+                    <button onclick="toggleDomain('${domain}')" class="${isActive ? 'block' : ''}">
+                        ${isActive ? '禁用' : '启用'}
+                    </button>
                 `;
-                container.appendChild(card);
+                container.appendChild(item);
             });
         }
 
         // 切换域名状态
-        async function toggleDomain(domain, newStatus) {
-            const success = await updateDomainStatus(domain, newStatus);
-            if (success) {
-                initPage();
-            } else {
-                alert('操作失败，请重试');
-            }
+        function toggleDomain(domain) {
+            const statuses = getDomainStatuses();
+            statuses[domain] = !statuses[domain];
+            saveDomainStatuses(statuses);
+            updateDomainList();
         }
 
-        // 页面加载完成后初始化
-        document.addEventListener('DOMContentLoaded', initPage);
+        // 页面加载时初始化
+        window.onload = function() {
+            initializeDomainStatuses();
+            updateDomainList();
+        };
     </script>
 </body>
 </html> 

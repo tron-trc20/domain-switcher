@@ -2,77 +2,139 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>跳转中...</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>域名切换</title>
     <script src="config.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+            background-color: #f5f5f5;
+        }
+        .loading {
+            margin-top: 50px;
+            font-size: 18px;
+            color: #333;
+        }
+        .error {
+            margin-top: 20px;
+            color: #dc3545;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading">正在加载...</div>
+    <div class="error" style="display: none;"></div>
+
     <script>
-        // 从localStorage获取域名状态
-        function getDomainStatus() {
-            return JSON.parse(localStorage.getItem('domainStatus') || '{}');
+        // 从 localStorage 获取域名状态
+        function getDomainStatuses() {
+            const statuses = localStorage.getItem('domainStatuses');
+            return statuses ? JSON.parse(statuses) : {};
         }
 
-        // 从localStorage获取当前使用的域名索引
-        let currentIndex = parseInt(localStorage.getItem('currentDomainIndex') || '0');
+        // 获取可用域名列表
+        function getActiveDomains() {
+            const statuses = getDomainStatuses();
+            return CONFIG.domains.filter(domain => statuses[domain] !== false);
+        }
+
+        // 获取当前域名索引
+        function getCurrentIndex() {
+            const index = localStorage.getItem('currentDomainIndex');
+            return index ? parseInt(index) : 0;
+        }
+
+        // 保存当前域名索引
+        function saveCurrentIndex(index) {
+            localStorage.setItem('currentDomainIndex', index.toString());
+        }
 
         // 获取下一个可用域名
         function getNextDomain() {
-            const domains = CONFIG.activeDomains;
-            const status = getDomainStatus();
-            let attempts = 0;
-            
-            while (attempts < domains.length) {
-                // 如果当前索引超出范围，重置为0
-                if (currentIndex >= domains.length) {
-                    currentIndex = 0;
-                }
-                
-                const domain = domains[currentIndex];
-                
-                // 检查域名是否可用
-                if (status[domain] !== 'blocked') {
-                    // 更新索引并保存
-                    currentIndex = (currentIndex + 1) % domains.length;
-                    localStorage.setItem('currentDomainIndex', currentIndex.toString());
-                    return domain;
-                }
-                
-                currentIndex++;
-                attempts++;
+            const activeDomains = getActiveDomains();
+            if (activeDomains.length === 0) {
+                throw new Error('没有可用的域名');
             }
             
-            // 如果所有域名都被禁用，使用第一个域名
-            return domains[0];
+            let currentIndex = getCurrentIndex();
+            currentIndex = (currentIndex + 1) % activeDomains.length;
+            saveCurrentIndex(currentIndex);
+            
+            return activeDomains[currentIndex];
         }
 
-        // 主要逻辑
-        window.onload = function() {
-            // 检查是否在微信中
-            const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
-            
-            if (isWeChat) {
+        // 检查是否在微信中打开
+        function isWechat() {
+            const ua = navigator.userAgent.toLowerCase();
+            return ua.indexOf('micromessenger') !== -1;
+        }
+
+        // 主函数
+        function main() {
+            if (!isWechat()) {
+                document.querySelector('.loading').style.display = 'none';
+                document.querySelector('.error').style.display = 'block';
+                document.querySelector('.error').textContent = '请在微信中打开此链接';
+                return;
+            }
+
+            try {
                 const currentDomain = window.location.hostname;
-                const status = getDomainStatus();
                 
-                // 如果当前是github.io域名或者是被禁用的域名，跳转到下一个可用域名
-                if (currentDomain.includes('github.io') || status[currentDomain] === 'blocked') {
+                // 如果当前是 GitHub Pages 域名，直接跳转到第一个可用域名
+                if (currentDomain.includes('github.io')) {
+                    const activeDomains = getActiveDomains();
+                    if (activeDomains.length > 0) {
+                        window.location.href = `https://${activeDomains[0]}`;
+                    } else {
+                        throw new Error('没有可用的域名');
+                    }
+                    return;
+                }
+
+                // 如果当前域名被禁用，切换到下一个
+                const statuses = getDomainStatuses();
+                if (statuses[currentDomain] === false) {
                     const nextDomain = getNextDomain();
                     window.location.href = `https://${nextDomain}`;
+                    return;
                 }
-            } else {
-                // 如果不是在微信中访问，显示提示信息
-                document.body.innerHTML = `
-                    <div style="text-align: center; margin-top: 50px;">
-                        <h2>请在微信中打开此页面</h2>
-                        <p>本服务仅支持微信访问</p>
-                    </div>
-                `;
+
+                // 监控页面变化
+                const observer = new MutationObserver((mutations) => {
+                    for (const mutation of mutations) {
+                        const nodes = Array.from(mutation.addedNodes);
+                        for (const node of nodes) {
+                            if (node.nodeType === 1) { // 元素节点
+                                const text = node.textContent || '';
+                                if (text.includes('网页无法打开') || text.includes('系统繁忙')) {
+                                    const nextDomain = getNextDomain();
+                                    window.location.href = `https://${nextDomain}`;
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                });
+
+                observer.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+
+            } catch (error) {
+                document.querySelector('.loading').style.display = 'none';
+                document.querySelector('.error').style.display = 'block';
+                document.querySelector('.error').textContent = error.message;
             }
-        };
+        }
+
+        // 页面加载完成后执行
+        window.onload = main;
     </script>
-</head>
-<body>
-    <div style="text-align: center; margin-top: 50px;">
-        <h2>正在加载...</h2>
-        <p>请稍候，正在切换到可用域名</p>
-    </div>
 </body>
 </html> 

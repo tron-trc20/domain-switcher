@@ -24,5 +24,13 @@ const CONFIG = {
         // "l.cnrenlizi.com",
         // "m.cnrenlizi.com",
         // "n.cnrenlizi.com",
+    ],
+
+    // 所有可用的域名列表
+    domains: [
+        "cnrenlizi.com",
+        "a.cnrenlizi.com",
+        "b.cnrenlizi.com",
+        // 在这里添加更多域名
     ]
 }; 
