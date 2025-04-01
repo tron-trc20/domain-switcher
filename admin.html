@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>域名管理后台</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .domain-list {
+            margin: 20px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .domain-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .domain-item:last-child {
+            border-bottom: none;
+        }
+        .domain-item .status {
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+        .status.active {
+            background: #e6f4ea;
+            color: #1e8e3e;
+        }
+        .status.blocked {
+            background: #fce8e6;
+            color: #d93025;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button.delete {
+            background-color: #dc3545;
+        }
+        button.delete:hover {
+            background-color: #c82333;
+        }
+        input[type="text"] {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 300px;
+        }
+        .batch-input {
+            width: 100%;
+            height: 100px;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>域名管理后台</h1>
+        
+        <div class="controls">
+            <input type="text" id="newDomain" placeholder="输入新域名">
+            <button onclick="addDomain()">添加域名</button>
+            <button onclick="checkAllDomains()">检查所有域名</button>
+        </div>
+
+        <div class="batch-controls">
+            <textarea class="batch-input" id="batchDomains" placeholder="批量添加域名，每行一个"></textarea>
+            <button onclick="addBatchDomains()">批量添加</button>
+        </div>
+
+        <div class="domain-list" id="domainList">
+            <!-- 域名列表将通过JavaScript动态添加 -->
+        </div>
+    </div>
+
+    <script>
+        // 从localStorage获取域名列表
+        let domains = JSON.parse(localStorage.getItem('domains') || '[]');
+        let blockedDomains = JSON.parse(localStorage.getItem('blockedDomains') || '[]');
+
+        // 初始化页面
+        function initPage() {
+            updateDomainList();
+        }
+
+        // 更新域名列表显示
+        function updateDomainList() {
+            const domainList = document.getElementById('domainList');
+            domainList.innerHTML = '';
+            
+            domains.forEach((domain, index) => {
+                const isBlocked = blockedDomains.includes(domain);
+                const domainItem = document.createElement('div');
+                domainItem.className = 'domain-item';
+                domainItem.innerHTML = `
+                    <span>${domain}</span>
+                    <div>
+                        <span class="status ${isBlocked ? 'blocked' : 'active'}">${isBlocked ? '已封禁' : '正常'}</span>
+                        <button onclick="moveDomain(${index}, 'up')" ${index === 0 ? 'disabled' : ''}>上移</button>
+                        <button onclick="moveDomain(${index}, 'down')" ${index === domains.length - 1 ? 'disabled' : ''}>下移</button>
+                        <button class="delete" onclick="deleteDomain(${index})">删除</button>
+                    </div>
+                `;
+                domainList.appendChild(domainItem);
+            });
+            
+            // 保存到localStorage
+            saveDomains();
+        }
+
+        // 添加单个域名
+        function addDomain() {
+            const input = document.getElementById('newDomain');
+            const domain = input.value.trim();
+            
+            if (domain && !domains.includes(domain)) {
+                domains.push(domain);
+                input.value = '';
+                updateDomainList();
+            }
+        }
+
+        // 批量添加域名
+        function addBatchDomains() {
+            const textarea = document.getElementById('batchDomains');
+            const newDomains = textarea.value.trim().split('\n').filter(d => d.trim());
+            
+            newDomains.forEach(domain => {
+                if (!domains.includes(domain)) {
+                    domains.push(domain);
+                }
+            });
+            
+            textarea.value = '';
+            updateDomainList();
+        }
+
+        // 删除域名
+        function deleteDomain(index) {
+            domains.splice(index, 1);
+            updateDomainList();
+        }
+
+        // 移动域名位置
+        function moveDomain(index, direction) {
+            if (direction === 'up' && index > 0) {
+                [domains[index], domains[index - 1]] = [domains[index - 1], domains[index]];
+            } else if (direction === 'down' && index < domains.length - 1) {
+                [domains[index], domains[index + 1]] = [domains[index + 1], domains[index]];
+            }
+            updateDomainList();
+        }
+
+        // 检查所有域名状态
+        async function checkAllDomains() {
+            for (let domain of domains) {
+                try {
+                    const response = await fetch(`https://${domain}/favicon.ico`, {
+                        mode: 'no-cors',
+                        cache: 'no-cache'
+                    });
+                    
+                    if (blockedDomains.includes(domain)) {
+                        blockedDomains = blockedDomains.filter(d => d !== domain);
+                    }
+                } catch (error) {
+                    if (!blockedDomains.includes(domain)) {
+                        blockedDomains.push(domain);
+                    }
+                }
+            }
+            
+            localStorage.setItem('blockedDomains', JSON.stringify(blockedDomains));
+            updateDomainList();
+        }
+
+        // 保存域名列表到localStorage
+        function saveDomains() {
+            localStorage.setItem('domains', JSON.stringify(domains));
+        }
+
+        // 页面加载时初始化
+        window.onload = initPage;
+    </script>
+</body>
+</html> 
