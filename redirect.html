@@ -86,10 +86,18 @@
             const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
             
             if (isWeChat) {
+                // 获取当前域名
+                const currentDomain = window.location.hostname;
+                
+                // 如果当前是github.io域名，直接跳转到第一个可用域名
+                if (currentDomain.includes('github.io')) {
+                    const nextDomain = getNextAvailableDomain();
+                    window.location.href = `https://${nextDomain}`;
+                    return;
+                }
+                
                 // 如果检测到是封禁页面
                 if (checkWeChatBlock()) {
-                    // 获取当前域名
-                    const currentDomain = window.location.hostname;
                     // 标记当前域名为已封禁
                     markDomainAsBlocked(currentDomain);
                     // 获取下一个可用域名
@@ -97,6 +105,14 @@
                     // 跳转到新域名
                     window.location.href = `https://${nextDomain}`;
                 }
+            } else {
+                // 如果不是在微信中访问，显示提示信息
+                document.body.innerHTML = `
+                    <div style="text-align: center; margin-top: 50px;">
+                        <h2>请在微信中打开此页面</h2>
+                        <p>本服务仅支持微信访问</p>
+                    </div>
+                `;
             }
         };
     </script>
@@ -104,6 +120,7 @@
 <body>
     <div style="text-align: center; margin-top: 50px;">
         <h2>正在加载...</h2>
+        <p>请稍候，正在检查域名可用性</p>
     </div>
 </body>
 </html> 
