@@ -36,48 +36,70 @@
         ];
 
         // 从localStorage获取已知的被封禁域名
-        const blockedDomains = JSON.parse(localStorage.getItem('blockedDomains') || '[]');
+        let blockedDomains = JSON.parse(localStorage.getItem('blockedDomains') || '[]');
         
         // 从localStorage获取上次使用的域名索引
         let currentIndex = parseInt(localStorage.getItem('currentDomainIndex') || '0');
-        
-        // 获取可用的域名
-        function getNextAvailableDomain() {
-            while (currentIndex < domains.length) {
-                const domain = domains[currentIndex];
-                if (!blockedDomains.includes(domain)) {
-                    return domain;
-                }
-                currentIndex++;
-            }
-            // 如果所有域名都尝试过，重新开始
-            currentIndex = 0;
-            return domains[0];
-        }
-
-        // 标记域名为已封禁
-        function markDomainAsBlocked(domain) {
-            if (!blockedDomains.includes(domain)) {
-                blockedDomains.push(domain);
-                localStorage.setItem('blockedDomains', JSON.stringify(blockedDomains));
-            }
-            currentIndex++;
-            localStorage.setItem('currentDomainIndex', currentIndex.toString());
-        }
 
         // 检测页面是否被微信封禁
-        function checkWeChatBlock() {
-            const content = document.body.innerText.toLowerCase();
+        function isBlocked() {
+            const content = document.body.innerText || '';
             const blockIndicators = [
                 '已停止访问该网页',
+                '已停止访问',
                 '经网址安全检测',
                 '该网页包含恶意欺诈内容',
                 '为维护绿色上网环境',
-                '已停止访问',
                 '申请恢复访问'
             ];
             
             return blockIndicators.some(indicator => content.includes(indicator));
+        }
+
+        // 获取下一个可用域名
+        function getNextAvailableDomain() {
+            let attempts = 0;
+            const maxAttempts = domains.length;
+            
+            while (attempts < maxAttempts) {
+                // 如果当前索引超出范围，重置为0
+                if (currentIndex >= domains.length) {
+                    currentIndex = 0;
+                }
+                
+                const domain = domains[currentIndex];
+                
+                // 如果该域名未被标记为封禁，则使用它
+                if (!blockedDomains.includes(domain)) {
+                    return domain;
+                }
+                
+                currentIndex++;
+                attempts++;
+            }
+            
+            // 如果所有域名都被封禁，清除封禁列表并从头开始
+            console.log('所有域名都被标记为封禁，重置列表');
+            blockedDomains = [];
+            localStorage.setItem('blockedDomains', JSON.stringify(blockedDomains));
+            currentIndex = 0;
+            return domains[0];
+        }
+
+        // 标记当前域名为已封禁并获取下一个域名
+        function handleBlockedDomain(currentDomain) {
+            console.log('域名被封禁:', currentDomain);
+            if (!blockedDomains.includes(currentDomain)) {
+                blockedDomains.push(currentDomain);
+                localStorage.setItem('blockedDomains', JSON.stringify(blockedDomains));
+            }
+            
+            currentIndex++;
+            localStorage.setItem('currentDomainIndex', currentIndex.toString());
+            
+            const nextDomain = getNextAvailableDomain();
+            console.log('切换到下一个域名:', nextDomain);
+            return nextDomain;
         }
 
         // 主要逻辑
@@ -96,15 +118,13 @@
                     return;
                 }
                 
-                // 如果检测到是封禁页面
-                if (checkWeChatBlock()) {
-                    // 标记当前域名为已封禁
-                    markDomainAsBlocked(currentDomain);
-                    // 获取下一个可用域名
-                    const nextDomain = getNextAvailableDomain();
-                    // 跳转到新域名
-                    window.location.href = `https://${nextDomain}`;
-                }
+                // 延迟检查，确保页面内容已完全加载
+                setTimeout(() => {
+                    if (isBlocked()) {
+                        const nextDomain = handleBlockedDomain(currentDomain);
+                        window.location.href = `https://${nextDomain}`;
+                    }
+                }, 500);
             } else {
                 // 如果不是在微信中访问，显示提示信息
                 document.body.innerHTML = `
