@@ -108,115 +108,81 @@
     </div>
 
     <script>
-        // 从localStorage获取域名状态
-        let domainStatus = JSON.parse(localStorage.getItem('domainStatus') || '{}');
-        let originalStatus = {...domainStatus}; // 保存原始状态用于重置
-        let hasChanges = false;
-
-        // 初始化域名状态
-        function initDomainStatus() {
-            // 将配置文件中的所有域名初始化为可用状态
-            CONFIG.activeDomains.forEach(domain => {
-                if (!(domain in domainStatus)) {
-                    domainStatus[domain] = 'active';
-                }
-            });
-
-            // 将已禁用的域名标记为blocked
-            CONFIG.blockedDomains.forEach(domain => {
-                if (domain && !domain.startsWith('//')) {
-                    domainStatus[domain] = 'blocked';
-                }
-            });
-
-            saveToLocalStorage();
-            updateDomainList();
+        const API_BASE_URL = 'http://localhost:5001/api';
+        
+        // 获取域名列表
+        async function getDomains() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/domains`);
+                const domains = await response.json();
+                return domains;
+            } catch (error) {
+                console.error('获取域名列表失败:', error);
+                return [];
+            }
         }
 
-        // 更新域名列表显示
-        function updateDomainList() {
-            const domainList = document.getElementById('domainList');
-            domainList.innerHTML = '';
+        // 更新域名状态
+        async function updateDomainStatus(domain, isActive) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/domains/${domain}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        is_active: isActive,
+                        blocked_at: isActive ? null : new Date().toISOString()
+                    })
+                });
+                if (response.ok) {
+                    return true;
+                }
+                return false;
+            } catch (error) {
+                console.error('更新域名状态失败:', error);
+                return false;
+            }
+        }
+
+        // 初始化页面
+        async function initPage() {
+            const domains = await getDomains();
+            const container = document.getElementById('domainList');
+            container.innerHTML = '';
             
-            // 显示活跃域名
-            CONFIG.activeDomains.forEach(domain => {
-                if (!domain.startsWith('//')) { // 跳过注释的域名
-                    const status = domainStatus[domain] || 'active';
-                    addDomainItem(domain, status);
-                }
+            domains.forEach(domain => {
+                const card = document.createElement('div');
+                card.className = 'domain-card';
+                card.innerHTML = `
+                    <div class="domain-info">
+                        <h3>${domain.domain}</h3>
+                        <p>状态: ${domain.is_active ? '启用' : '禁用'}</p>
+                        ${domain.blocked_at ? `<p>禁用时间: ${new Date(domain.blocked_at).toLocaleString()}</p>` : ''}
+                    </div>
+                    <div class="domain-actions">
+                        <button onclick="toggleDomain('${domain.domain}', ${!domain.is_active})" 
+                                class="${domain.is_active ? 'disable-btn' : 'enable-btn'}">
+                            ${domain.is_active ? '禁用' : '启用'}
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
             });
-        }
-
-        // 添加域名项到列表
-        function addDomainItem(domain, status) {
-            const domainList = document.getElementById('domainList');
-            const item = document.createElement('div');
-            item.className = 'domain-item';
-            item.innerHTML = `
-                <div>
-                    <span class="status ${status}">${status === 'active' ? '正常' : '已禁用'}</span>
-                    <span>${domain}</span>
-                </div>
-                <div>
-                    ${status === 'active' ? 
-                        `<button class="block" onclick="toggleDomain('${domain}', 'blocked')">禁用</button>` :
-                        `<button class="unblock" onclick="toggleDomain('${domain}', 'active')">启用</button>`
-                    }
-                </div>
-            `;
-            domainList.appendChild(item);
         }
 
         // 切换域名状态
-        function toggleDomain(domain, newStatus) {
-            domainStatus[domain] = newStatus;
-            updateDomainList();
-            showSaveBar();
-        }
-
-        // 显示保存栏
-        function showSaveBar() {
-            hasChanges = true;
-            document.getElementById('saveBar').classList.add('show');
-        }
-
-        // 隐藏保存栏
-        function hideSaveBar() {
-            hasChanges = false;
-            document.getElementById('saveBar').classList.remove('show');
-        }
-
-        // 保存更改到localStorage
-        function saveChanges() {
-            saveToLocalStorage();
-            originalStatus = {...domainStatus};
-            hideSaveBar();
-            alert('更改已保存');
-        }
-
-        // 重置更改
-        function resetChanges() {
-            domainStatus = {...originalStatus};
-            updateDomainList();
-            hideSaveBar();
-        }
-
-        // 保存到localStorage
-        function saveToLocalStorage() {
-            localStorage.setItem('domainStatus', JSON.stringify(domainStatus));
-        }
-
-        // 页面加载时初始化
-        window.onload = function() {
-            initDomainStatus();
-        };
-
-        // 离开页面前检查是否有未保存的更改
-        window.onbeforeunload = function(e) {
-            if (hasChanges) {
-                return '您有未保存的更改，确定要离开吗？';
+        async function toggleDomain(domain, newStatus) {
+            const success = await updateDomainStatus(domain, newStatus);
+            if (success) {
+                initPage();
+            } else {
+                alert('操作失败，请重试');
             }
-        };
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', initPage);
     </script>
 </body>
 </html> 
