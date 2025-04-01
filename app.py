@@ -13,12 +13,24 @@ def load_config():
             content = f.read()
             # 提取CONFIG对象的内容
             config_str = content.split('CONFIG = ')[1].strip().rstrip(';')
-            return json.loads(config_str)
-    return {"domains": [], "disabled_domains": []}
+            config = json.loads(config_str)
+            # 转换键名以匹配应用逻辑
+            return {
+                "domains": config.get("activeDomains", []),
+                "disabled_domains": config.get("blockedDomains", []),
+                "backup_domains": config.get("backupDomains", [])
+            }
+    return {"domains": [], "disabled_domains": [], "backup_domains": []}
 
 def save_config(config):
+    # 转换键名以匹配config.js的结构
+    config_js = {
+        "activeDomains": config.get("domains", []),
+        "blockedDomains": config.get("disabled_domains", []),
+        "backupDomains": config.get("backup_domains", [])
+    }
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-        f.write(f'const CONFIG = {json.dumps(config, ensure_ascii=False, indent=4)};')
+        f.write(f'const CONFIG = {json.dumps(config_js, ensure_ascii=False, indent=4)};')
 
 # 静态文件路由
 @app.route('/static/<path:filename>')
