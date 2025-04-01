@@ -1,54 +1,12 @@
-from flask import Flask, jsonify, request, render_template_string, send_from_directory
-import json
+from flask import Flask, render_template_string, send_from_directory
 import os
-import logging
 
 app = Flask(__name__)
-logging.basicConfig(level=logging.DEBUG)
-
-# 配置文件路径
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_FILE = os.path.join(BASE_DIR, 'static', 'config.js')
-
-def load_config():
-    try:
-        app.logger.debug(f'尝试加载配置文件: {CONFIG_FILE}')
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                content = f.read()
-                app.logger.debug(f'配置文件内容: {content}')
-                # 提取CONFIG对象的内容
-                config_str = content.split('CONFIG = ')[1].strip().rstrip(';')
-                config = json.loads(config_str)
-                app.logger.debug(f'解析后的配置: {config}')
-                return config
-        else:
-            app.logger.warning(f'配置文件不存在: {CONFIG_FILE}')
-    except Exception as e:
-        app.logger.error(f'加载配置文件时出错: {str(e)}')
-    return {"activeDomains": [], "blockedDomains": [], "backupDomains": []}
-
-def save_config(config):
-    try:
-        app.logger.debug(f'尝试保存配置: {config}')
-        os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
-        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-            content = f'const CONFIG = {json.dumps(config, ensure_ascii=False, indent=4)};'
-            f.write(content)
-            app.logger.debug('配置保存成功')
-    except Exception as e:
-        app.logger.error(f'保存配置文件时出错: {str(e)}')
-        raise
 
 # 静态文件路由
 @app.route('/static/<path:filename>')
 def serve_static(filename):
-    try:
-        app.logger.debug(f'请求静态文件: {filename}')
-        return send_from_directory(os.path.join(BASE_DIR, 'static'), filename)
-    except Exception as e:
-        app.logger.error(f'访问静态文件时出错: {str(e)}')
-        return str(e), 500
+    return send_from_directory(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static'), filename)
 
 # 主页（显示二维码）
 @app.route('/')
@@ -142,67 +100,60 @@ def index():
 # 重定向页面
 @app.route('/redirect')
 def redirect():
-    try:
-        app.logger.debug('开始处理重定向请求')
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                content = f.read()
-                app.logger.debug(f'配置文件内容: {content}')
-                config_str = content.split('CONFIG = ')[1].strip().rstrip(';')
-                config = json.loads(config_str)
-                app.logger.debug(f'解析后的配置: {config}')
-                
-                # 获取可用域名列表
-                available_domains = [d for d in config['activeDomains'] if d not in config['blockedDomains']]
-                app.logger.debug(f'可用域名列表: {available_domains}')
-                
-                if available_domains:
-                    target_domain = available_domains[0]
-                    app.logger.debug(f'重定向到域名: {target_domain}')
-                    return f'<script>window.location.href = "https://{target_domain}";</script>'
-        
-        app.logger.warning('没有可用的域名')
-        return render_template_string('''
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <title>错误</title>
-                <style>
-                    body {
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        justify-content: center;
-                        min-height: 100vh;
-                        margin: 0;
-                        background-color: #f5f5f5;
-                        font-family: Arial, sans-serif;
+    return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>域名跳转</title>
+            <script src="/static/config.js"></script>
+            <style>
+                body {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    min-height: 100vh;
+                    margin: 0;
+                    background-color: #f5f5f5;
+                    font-family: Arial, sans-serif;
+                }
+                .container {
+                    text-align: center;
+                    background: white;
+                    padding: 2rem;
+                    border-radius: 10px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                }
+                .error {
+                    color: #dc3545;
+                    margin: 10px 0;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>正在跳转...</h1>
+                <div id="message"></div>
+            </div>
+            <script>
+                window.onload = function() {
+                    const availableDomains = CONFIG.activeDomains.filter(
+                        domain => !CONFIG.blockedDomains.includes(domain)
+                    );
+                    
+                    if (availableDomains.length > 0) {
+                        window.location.href = "https://" + availableDomains[0];
+                    } else {
+                        document.getElementById("message").innerHTML = `
+                            <div class="error">没有可用的域名，请联系管理员</div>
+                        `;
                     }
-                    .container {
-                        text-align: center;
-                        background: white;
-                        padding: 2rem;
-                        border-radius: 10px;
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                    }
-                    .error {
-                        color: #dc3545;
-                        margin: 10px 0;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <h1>错误</h1>
-                    <div class="error">没有可用的域名，请联系管理员</div>
-                </div>
-            </body>
-            </html>
-        ''')
-    except Exception as e:
-        app.logger.error(f'重定向时出错: {str(e)}')
-        return str(e), 500
+                };
+            </script>
+        </body>
+        </html>
+    ''')
 
 # 管理后台
 @app.route('/admin')
@@ -319,28 +270,9 @@ def admin():
 
             <div class="instructions">
                 <h3>域名管理说明：</h3>
-                <p>1. 当域名被微信封禁时，请将其移动到"已禁用域名"列表</p>
-                <p>2. 可以通过单个添加或批量添加来添加新域名</p>
-                <p>3. 可以通过"移动"按钮在不同状态之间移动域名</p>
-                <p>4. 修改完成后，点击"保存更改"按钮保存更改</p>
-            </div>
-
-            <div class="add-domain">
-                <h3>添加新域名</h3>
-                <div class="input-group">
-                    <input type="text" id="newDomain" placeholder="输入单个域名（例如：example.com）">
-                    <button onclick="addNewDomain()">添加单个域名</button>
-                </div>
-                <div style="margin: 15px 0;">
-                    <strong>或</strong>
-                </div>
-                <textarea id="batchDomains" placeholder="批量添加域名，每行一个域名，例如：
-example1.com
-example2.com
-example3.com" style="width: 100%; height: 100px; margin-bottom: 10px;"></textarea>
-                <div class="input-group">
-                    <button onclick="addBatchDomains()">批量添加域名</button>
-                </div>
+                <p>1. 此页面仅用于查看当前域名状态</p>
+                <p>2. 如需修改域名配置，请直接修改 GitHub 仓库中的 config.js 文件</p>
+                <p>3. 修改完成后，在 Render 上重新部署即可生效</p>
             </div>
 
             <div class="domain-lists">
@@ -353,26 +285,9 @@ example3.com" style="width: 100%; height: 100px; margin-bottom: 10px;"></textare
                     <div id="blockedDomains" class="domain-list"></div>
                 </div>
             </div>
-
-            <div class="save-bar">
-                <button onclick="saveChanges()">保存更改</button>
-            </div>
         </div>
 
         <script>
-            const API_BASE_URL = window.location.origin;
-
-            // 加载域名列表
-            async function loadDomains() {
-                try {
-                    // 直接使用CONFIG对象
-                    displayDomains(CONFIG);
-                } catch (error) {
-                    console.error('加载域名失败:', error);
-                    alert('加载域名失败，请检查网络连接');
-                }
-            }
-
             // 显示域名列表
             function displayDomains(config) {
                 const activeList = document.getElementById('activeDomains');
@@ -380,221 +295,30 @@ example3.com" style="width: 100%; height: 100px; margin-bottom: 10px;"></textare
 
                 activeList.innerHTML = config.activeDomains
                     .filter(domain => !config.blockedDomains.includes(domain))
-                    .map(domain => createDomainElement(domain, 'active'))
+                    .map(domain => `
+                        <div class="domain-item">
+                            <span>${domain}</span>
+                        </div>
+                    `)
                     .join('');
 
                 blockedList.innerHTML = config.blockedDomains
-                    .map(domain => createDomainElement(domain, 'blocked'))
+                    .map(domain => `
+                        <div class="domain-item">
+                            <span>${domain}</span>
+                        </div>
+                    `)
                     .join('');
             }
 
-            // 创建域名元素
-            function createDomainElement(domain, status) {
-                return `
-                    <div class="domain-item">
-                        <span>${domain}</span>
-                        <div class="domain-actions">
-                            <button onclick="moveDomain('${domain}', '${status}')">移动</button>
-                            <button onclick="deleteDomain('${domain}', '${status}')">删除</button>
-                        </div>
-                    </div>
-                `;
-            }
-
-            // 添加新域名
-            async function addNewDomain() {
-                const input = document.getElementById('newDomain');
-                const domain = input.value.trim();
-
-                if (!domain) {
-                    alert('请输入域名');
-                    return;
-                }
-
-                if (!isValidDomain(domain)) {
-                    alert('请输入有效的域名');
-                    return;
-                }
-
-                try {
-                    const response = await fetch(`${API_BASE_URL}/api/config`);
-                    const config = await response.json();
-                    
-                    if (config.activeDomains.includes(domain)) {
-                        alert('该域名已存在');
-                        return;
-                    }
-
-                    config.activeDomains.push(domain);
-
-                    await fetch(`${API_BASE_URL}/api/config`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(config)
-                    });
-
-                    input.value = '';
-                    displayDomains(config);
-                } catch (error) {
-                    console.error('添加域名失败:', error);
-                    alert('添加域名失败，请检查网络连接');
-                }
-            }
-
-            // 批量添加域名
-            async function addBatchDomains() {
-                const textarea = document.getElementById('batchDomains');
-                const domains = textarea.value.split('\n')
-                    .map(d => d.trim())
-                    .filter(d => d && isValidDomain(d));
-
-                if (domains.length === 0) {
-                    alert('请输入有效的域名');
-                    return;
-                }
-
-                try {
-                    const response = await fetch(`${API_BASE_URL}/api/config`);
-                    const config = await response.json();
-                    
-                    const existingDomains = new Set(config.activeDomains);
-                    const newDomains = domains.filter(d => !existingDomains.has(d));
-
-                    if (newDomains.length === 0) {
-                        alert('所有输入的域名都已存在');
-                        return;
-                    }
-
-                    config.activeDomains.push(...newDomains);
-
-                    await fetch(`${API_BASE_URL}/api/config`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(config)
-                    });
-
-                    textarea.value = '';
-                    displayDomains(config);
-                    alert(`成功添加 ${newDomains.length} 个新域名`);
-                } catch (error) {
-                    console.error('批量添加域名失败:', error);
-                    alert('批量添加域名失败，请检查网络连接');
-                }
-            }
-
-            // 移动域名
-            async function moveDomain(domain, fromStatus) {
-                try {
-                    const response = await fetch(`${API_BASE_URL}/api/config`);
-                    const config = await response.json();
-                    
-                    if (fromStatus === 'active') {
-                        config.blockedDomains.push(domain);
-                    } else {
-                        config.blockedDomains = config.blockedDomains.filter(d => d !== domain);
-                    }
-
-                    await fetch(`${API_BASE_URL}/api/config`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(config)
-                    });
-
-                    displayDomains(config);
-                } catch (error) {
-                    console.error('移动域名失败:', error);
-                    alert('移动域名失败，请检查网络连接');
-                }
-            }
-
-            // 删除域名
-            async function deleteDomain(domain, status) {
-                if (!confirm(`确定要删除域名 ${domain} 吗？`)) {
-                    return;
-                }
-
-                try {
-                    const response = await fetch(`${API_BASE_URL}/api/config`);
-                    const config = await response.json();
-                    
-                    config.activeDomains = config.activeDomains.filter(d => d !== domain);
-                    config.blockedDomains = config.blockedDomains.filter(d => d !== domain);
-
-                    await fetch(`${API_BASE_URL}/api/config`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(config)
-                    });
-
-                    displayDomains(config);
-                } catch (error) {
-                    console.error('删除域名失败:', error);
-                    alert('删除域名失败，请检查网络连接');
-                }
-            }
-
-            // 保存更改
-            async function saveChanges() {
-                try {
-                    const response = await fetch(`${API_BASE_URL}/api/config`);
-                    const config = await response.json();
-                    
-                    await fetch(`${API_BASE_URL}/api/config`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(config)
-                    });
-
-                    alert('保存成功！');
-                } catch (error) {
-                    console.error('保存失败:', error);
-                    alert('保存失败，请检查网络连接');
-                }
-            }
-
-            // 验证域名格式
-            function isValidDomain(domain) {
-                const pattern = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9](?:\.[a-zA-Z]{2,})+$/;
-                return pattern.test(domain);
-            }
-
-            // 页面加载时获取域名列表
-            window.onload = loadDomains;
+            // 页面加载时显示域名列表
+            window.onload = function() {
+                displayDomains(CONFIG);
+            };
         </script>
     </body>
     </html>
     ''')
-
-@app.route('/api/config', methods=['GET'])
-def get_config():
-    try:
-        config = load_config()
-        app.logger.debug(f'获取配置: {config}')
-        return jsonify(config)
-    except Exception as e:
-        app.logger.error(f'获取配置时出错: {str(e)}')
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/config', methods=['POST'])
-def update_config():
-    try:
-        config = request.json
-        app.logger.debug(f'更新配置: {config}')
-        save_config(config)
-        return jsonify({"status": "success"})
-    except Exception as e:
-        app.logger.error(f'更新配置时出错: {str(e)}')
-        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000))) 
