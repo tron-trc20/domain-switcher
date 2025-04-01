@@ -3,40 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <title>跳转中...</title>
+    <script src="config.js"></script>
     <script>
-        // 从localStorage获取域名列表
-        function getDomains() {
-            return JSON.parse(localStorage.getItem('domains') || '[]');
+        // 从localStorage获取域名状态
+        function getDomainStatus() {
+            return JSON.parse(localStorage.getItem('domainStatus') || '{}');
         }
 
-        // 从localStorage获取已知的被封禁域名
-        let blockedDomains = JSON.parse(localStorage.getItem('blockedDomains') || '[]');
-        
-        // 从localStorage获取上次使用的域名索引
+        // 从localStorage获取当前使用的域名索引
         let currentIndex = parseInt(localStorage.getItem('currentDomainIndex') || '0');
 
-        // 检测页面是否被微信封禁
-        function isBlocked() {
-            const content = document.body.innerText || '';
-            const blockIndicators = [
-                '已停止访问该网页',
-                '已停止访问',
-                '经网址安全检测',
-                '该网页包含恶意欺诈内容',
-                '为维护绿色上网环境',
-                '申请恢复访问'
-            ];
-            
-            return blockIndicators.some(indicator => content.includes(indicator));
-        }
-
         // 获取下一个可用域名
-        function getNextAvailableDomain() {
-            const domains = getDomains();
+        function getNextDomain() {
+            const domains = CONFIG.activeDomains;
+            const status = getDomainStatus();
             let attempts = 0;
-            const maxAttempts = domains.length;
             
-            while (attempts < maxAttempts) {
+            while (attempts < domains.length) {
                 // 如果当前索引超出范围，重置为0
                 if (currentIndex >= domains.length) {
                     currentIndex = 0;
@@ -44,8 +27,11 @@
                 
                 const domain = domains[currentIndex];
                 
-                // 如果该域名未被标记为封禁，则使用它
-                if (!blockedDomains.includes(domain)) {
+                // 检查域名是否可用
+                if (status[domain] !== 'blocked') {
+                    // 更新索引并保存
+                    currentIndex = (currentIndex + 1) % domains.length;
+                    localStorage.setItem('currentDomainIndex', currentIndex.toString());
                     return domain;
                 }
                 
@@ -53,46 +39,8 @@
                 attempts++;
             }
             
-            // 如果所有域名都被封禁，清除封禁列表并从头开始
-            console.log('所有域名都被标记为封禁，重置列表');
-            blockedDomains = [];
-            localStorage.setItem('blockedDomains', JSON.stringify(blockedDomains));
-            currentIndex = 0;
+            // 如果所有域名都被禁用，使用第一个域名
             return domains[0];
-        }
-
-        // 标记当前域名为已封禁并获取下一个域名
-        function handleBlockedDomain(currentDomain) {
-            console.log('域名被封禁:', currentDomain);
-            if (!blockedDomains.includes(currentDomain)) {
-                blockedDomains.push(currentDomain);
-                localStorage.setItem('blockedDomains', JSON.stringify(blockedDomains));
-            }
-            
-            currentIndex++;
-            localStorage.setItem('currentDomainIndex', currentIndex.toString());
-            
-            const nextDomain = getNextAvailableDomain();
-            console.log('切换到下一个域名:', nextDomain);
-            return nextDomain;
-        }
-
-        // 检查页面状态并在需要时跳转
-        function checkAndRedirect() {
-            const currentDomain = window.location.hostname;
-            
-            // 如果当前是github.io域名，直接跳转到第一个可用域名
-            if (currentDomain.includes('github.io')) {
-                const nextDomain = getNextAvailableDomain();
-                window.location.href = `https://${nextDomain}`;
-                return;
-            }
-            
-            // 检查是否被封禁
-            if (isBlocked()) {
-                const nextDomain = handleBlockedDomain(currentDomain);
-                window.location.href = `https://${nextDomain}`;
-            }
         }
 
         // 主要逻辑
@@ -101,27 +49,14 @@
             const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
             
             if (isWeChat) {
-                // 立即开始检测
-                checkAndRedirect();
+                const currentDomain = window.location.hostname;
+                const status = getDomainStatus();
                 
-                // 设置定时器，每100ms检查一次
-                setInterval(checkAndRedirect, 100);
-                
-                // 监听DOM变化
-                const observer = new MutationObserver(() => {
-                    checkAndRedirect();
-                });
-                
-                // 配置观察选项
-                const config = { 
-                    childList: true, 
-                    subtree: true, 
-                    characterData: true,
-                    attributes: true
-                };
-                
-                // 开始观察
-                observer.observe(document.body, config);
+                // 如果当前是github.io域名或者是被禁用的域名，跳转到下一个可用域名
+                if (currentDomain.includes('github.io') || status[currentDomain] === 'blocked') {
+                    const nextDomain = getNextDomain();
+                    window.location.href = `https://${nextDomain}`;
+                }
             } else {
                 // 如果不是在微信中访问，显示提示信息
                 document.body.innerHTML = `
@@ -137,7 +72,7 @@
 <body>
     <div style="text-align: center; margin-top: 50px;">
         <h2>正在加载...</h2>
-        <p>请稍候，正在检查域名可用性</p>
+        <p>请稍候，正在切换到可用域名</p>
     </div>
 </body>
 </html> 
