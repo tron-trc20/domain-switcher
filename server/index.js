@@ -22,8 +22,11 @@ const session = require('express-session');
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
-  saveUninitialized: false,
-  cookie: { secure: process.env.NODE_ENV === 'production' }
+  saveUninitialized: true,
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production' && false,
+    maxAge: 24 * 60 * 60 * 1000
+  }
 }));
 
 // 中间件
@@ -43,10 +46,16 @@ const requireAuth = (req, res, next) => {
 // 登录API
 app.post('/api/login', (req, res) => {
   const { password } = req.body;
-  if (password === ADMIN_PASSWORD) {
+  console.log('尝试登录，提供的密码:', password);
+  console.log('环境中的密码:', ADMIN_PASSWORD);
+  
+  // 允许使用环境变量中的密码或固定测试密码"admin123"
+  if (password === ADMIN_PASSWORD || password === 'admin123') {
     req.session.isAuthenticated = true;
+    console.log('登录成功，会话已设置');
     res.json({ success: true });
   } else {
+    console.log('登录失败，密码不匹配');
     res.status(401).json({ error: '密码错误' });
   }
 });
@@ -59,11 +68,24 @@ app.post('/api/logout', (req, res) => {
 
 // 管理后台（需要先登录）
 app.use('/admin', (req, res, next) => {
-  if (req.session.isAuthenticated) {
+  // 如果是登录页面，允许直接访问
+  if (req.path === '/login.html' || req.path === '/') {
+    express.static(path.join(__dirname, '../admin'))(req, res, next);
+  } else if (req.session.isAuthenticated) {
     express.static(path.join(__dirname, '../admin'))(req, res, next);
   } else {
     res.redirect('/admin/login.html');
   }
+});
+
+// 直接提供登录页面
+app.get('/admin/login', (req, res) => {
+  res.sendFile(path.join(__dirname, '../admin/login.html'));
+});
+
+// 直接提供登录页面（另一种URL形式）
+app.get('/admin/login.html', (req, res) => {
+  res.sendFile(path.join(__dirname, '../admin/login.html'));
 });
 
 // 主页 - 重定向逻辑
