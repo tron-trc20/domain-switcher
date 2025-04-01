@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>域名切换</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f5f5f5;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            text-align: center;
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 90%;
+            width: 400px;
+        }
+        #qrcode {
+            margin: 20px auto;
+            position: relative;
+            width: 256px;
+            height: 256px;
+        }
+        #qrcode img.logo {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px;
+            height: 50px;
+            z-index: 2;
+            background: white;
+            padding: 5px;
+            border-radius: 50%;
+        }
+        .loading {
+            margin: 20px 0;
+            font-size: 18px;
+            color: #666;
+        }
+        .error {
+            color: #dc3545;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>域名切换</h1>
+        <div id="qrcode"></div>
+        <div id="loading" class="loading">正在加载可用域名...</div>
+        <div id="error" class="error"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://your-render-app.onrender.com'; // 替换为您的Render应用URL
+
+        // 检查是否在微信中打开
+        function isWeixinBrowser() {
+            return /micromessenger/i.test(navigator.userAgent);
+        }
+
+        // 获取下一个可用域名
+        async function getNextDomain() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/domains/active`);
+                const domains = await response.json();
+                
+                if (domains.length === 0) {
+                    throw new Error('没有可用的域名');
+                }
+
+                // 获取当前域名索引
+                const currentDomain = window.location.hostname;
+                const currentIndex = domains.indexOf(currentDomain);
+                
+                // 获取下一个域名
+                const nextIndex = (currentIndex + 1) % domains.length;
+                return domains[nextIndex];
+            } catch (error) {
+                console.error('获取域名失败:', error);
+                throw error;
+            }
+        }
+
+        // 生成二维码
+        async function generateQRCode() {
+            try {
+                const nextDomain = await getNextDomain();
+                const qrcode = new QRCode(document.getElementById("qrcode"), {
+                    text: `https://${nextDomain}`,
+                    width: 256,
+                    height: 256,
+                    colorDark : "#000000",
+                    colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.H
+                });
+
+                // 添加Logo
+                setTimeout(() => {
+                    const img = document.createElement('img');
+                    img.src = 'logo.png';
+                    img.className = 'logo';
+                    img.onload = function() {
+                        document.getElementById("qrcode").appendChild(img);
+                    }
+                }, 100);
+
+                document.getElementById('loading').textContent = '域名切换成功！';
+            } catch (error) {
+                document.getElementById('loading').textContent = '加载失败';
+                document.getElementById('error').textContent = error.message;
+            }
+        }
+
+        // 页面加载时执行
+        window.onload = function() {
+            if (!isWeixinBrowser()) {
+                document.getElementById('error').textContent = '请在微信中打开此页面';
+                return;
+            }
+            generateQRCode();
+        };
+    </script>
+</body>
+</html> 

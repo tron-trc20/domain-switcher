@@ -30,18 +30,6 @@
     <div class="error" style="display: none;"></div>
 
     <script>
-        // 从 localStorage 获取域名状态
-        function getDomainStatuses() {
-            const statuses = localStorage.getItem('domainStatuses');
-            return statuses ? JSON.parse(statuses) : {};
-        }
-
-        // 获取可用域名列表
-        function getActiveDomains() {
-            const statuses = getDomainStatuses();
-            return CONFIG.domains.filter(domain => statuses[domain] !== false);
-        }
-
         // 获取当前域名索引
         function getCurrentIndex() {
             const index = localStorage.getItem('currentDomainIndex');
@@ -55,16 +43,16 @@
 
         // 获取下一个可用域名
         function getNextDomain() {
-            const activeDomains = getActiveDomains();
-            if (activeDomains.length === 0) {
+            const domains = CONFIG.activeDomains;
+            if (domains.length === 0) {
                 throw new Error('没有可用的域名');
             }
             
             let currentIndex = getCurrentIndex();
-            currentIndex = (currentIndex + 1) % activeDomains.length;
+            currentIndex = (currentIndex + 1) % domains.length;
             saveCurrentIndex(currentIndex);
             
-            return activeDomains[currentIndex];
+            return domains[currentIndex];
         }
 
         // 检查是否在微信中打开
@@ -87,18 +75,16 @@
                 
                 // 如果当前是 GitHub Pages 域名，直接跳转到第一个可用域名
                 if (currentDomain.includes('github.io')) {
-                    const activeDomains = getActiveDomains();
-                    if (activeDomains.length > 0) {
-                        window.location.href = `https://${activeDomains[0]}`;
+                    if (CONFIG.activeDomains.length > 0) {
+                        window.location.href = `https://${CONFIG.activeDomains[0]}`;
                     } else {
                         throw new Error('没有可用的域名');
                     }
                     return;
                 }
 
-                // 如果当前域名被禁用，切换到下一个
-                const statuses = getDomainStatuses();
-                if (statuses[currentDomain] === false) {
+                // 如果当前域名不在可用列表中，切换到下一个
+                if (!CONFIG.activeDomains.includes(currentDomain)) {
                     const nextDomain = getNextDomain();
                     window.location.href = `https://${nextDomain}`;
                     return;

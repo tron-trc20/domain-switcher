@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>域名管理后台</title>
+    <style>
+        /* ... 保持原有样式 ... */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>域名管理后台</h1>
+            <a href="index.html" class="qr-link">查看二维码</a>
+        </div>
+
+        <div class="instructions">
+            <h3>域名管理说明：</h3>
+            <p>1. 当域名被微信封禁时，请将其移动到"已禁用域名"列表</p>
+            <p>2. 可以通过单个添加或批量添加来添加新域名</p>
+            <p>3. 可以通过"移动"按钮在不同状态之间移动域名</p>
+            <p>4. 修改完成后，点击"保存更改"按钮保存更改</p>
+        </div>
+
+        <div class="add-domain">
+            <h3>添加新域名</h3>
+            <div class="input-group">
+                <input type="text" id="newDomain" placeholder="输入单个域名（例如：example.com）">
+                <select id="domainStatus">
+                    <option value="active">可用域名</option>
+                    <option value="backup">备用域名</option>
+                </select>
+                <button onclick="addNewDomain()">添加单个域名</button>
+            </div>
+            <div style="margin: 15px 0;">
+                <strong>或</strong>
+            </div>
+            <textarea id="batchDomains" placeholder="批量添加域名，每行一个域名，例如：
+example1.com
+example2.com
+example3.com"></textarea>
+            <div class="input-group">
+                <select id="batchDomainStatus">
+                    <option value="active">可用域名</option>
+                    <option value="backup">备用域名</option>
+                </select>
+                <button onclick="addBatchDomains()">批量添加域名</button>
+            </div>
+            <div class="help-text">
+                提示：批量添加时，每行输入一个域名，系统会自动过滤重复和无效的域名
+            </div>
+        </div>
+
+        <div class="domain-lists">
+            <div class="list-section">
+                <h3>可用域名</h3>
+                <div id="activeDomains" class="domain-list"></div>
+            </div>
+            <div class="list-section">
+                <h3>已禁用域名</h3>
+                <div id="blockedDomains" class="domain-list"></div>
+            </div>
+            <div class="list-section">
+                <h3>备用域名</h3>
+                <div id="backupDomains" class="domain-list"></div>
+            </div>
+        </div>
+
+        <div class="save-bar">
+            <button onclick="saveChanges()">保存更改</button>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://your-render-app.onrender.com'; // 替换为您的Render应用URL
+
+        // 加载域名列表
+        async function loadDomains() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/config`);
+                const config = await response.json();
+                displayDomains(config);
+            } catch (error) {
+                console.error('加载域名失败:', error);
+                alert('加载域名失败，请检查网络连接');
+            }
+        }
+
+        // 显示域名列表
+        function displayDomains(config) {
+            const activeList = document.getElementById('activeDomains');
+            const blockedList = document.getElementById('blockedDomains');
+            const backupList = document.getElementById('backupDomains');
+
+            activeList.innerHTML = config.activeDomains.map(domain => createDomainElement(domain, 'active')).join('');
+            blockedList.innerHTML = config.blockedDomains.map(domain => createDomainElement(domain, 'blocked')).join('');
+            backupList.innerHTML = config.backupDomains.map(domain => createDomainElement(domain, 'backup')).join('');
+        }
+
+        // 创建域名元素
+        function createDomainElement(domain, status) {
+            return `
+                <div class="domain-item">
+                    <span>${domain}</span>
+                    <div class="domain-actions">
+                        <button onclick="moveDomain('${domain}', '${status}')">移动</button>
+                        <button onclick="deleteDomain('${domain}', '${status}')">删除</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 添加新域名
+        async function addNewDomain() {
+            const input = document.getElementById('newDomain');
+            const status = document.getElementById('domainStatus').value;
+            const domain = input.value.trim();
+
+            if (!domain) {
+                alert('请输入域名');
+                return;
+            }
+
+            if (!isValidDomain(domain)) {
+                alert('请输入有效的域名');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/config`);
+                const config = await response.json();
+                
+                // 检查域名是否已存在
+                if (config.activeDomains.includes(domain) || 
+                    config.blockedDomains.includes(domain) || 
+                    config.backupDomains.includes(domain)) {
+                    alert('该域名已存在');
+                    return;
+                }
+
+                // 添加到对应列表
+                if (status === 'active') {
+                    config.activeDomains.push(domain);
+                } else {
+                    config.backupDomains.push(domain);
+                }
+
+                await fetch(`${API_BASE_URL}/api/config`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                input.value = '';
+                displayDomains(config);
+            } catch (error) {
+                console.error('添加域名失败:', error);
+                alert('添加域名失败，请检查网络连接');
+            }
+        }
+
+        // 批量添加域名
+        async function addBatchDomains() {
+            const textarea = document.getElementById('batchDomains');
+            const status = document.getElementById('batchDomainStatus').value;
+            const domains = textarea.value.split('\n')
+                .map(d => d.trim())
+                .filter(d => d && isValidDomain(d));
+
+            if (domains.length === 0) {
+                alert('请输入有效的域名');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/config`);
+                const config = await response.json();
+                
+                const existingDomains = new Set([
+                    ...config.activeDomains,
+                    ...config.blockedDomains,
+                    ...config.backupDomains
+                ]);
+
+                const newDomains = domains.filter(d => !existingDomains.has(d));
+
+                if (newDomains.length === 0) {
+                    alert('所有输入的域名都已存在');
+                    return;
+                }
+
+                if (status === 'active') {
+                    config.activeDomains.push(...newDomains);
+                } else {
+                    config.backupDomains.push(...newDomains);
+                }
+
+                await fetch(`${API_BASE_URL}/api/config`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                textarea.value = '';
+                displayDomains(config);
+                alert(`成功添加 ${newDomains.length} 个新域名`);
+            } catch (error) {
+                console.error('批量添加域名失败:', error);
+                alert('批量添加域名失败，请检查网络连接');
+            }
+        }
+
+        // 移动域名
+        async function moveDomain(domain, fromStatus) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/config`);
+                const config = await response.json();
+                
+                // 从原列表中移除
+                config[`${fromStatus}Domains`] = config[`${fromStatus}Domains`].filter(d => d !== domain);
+                
+                // 添加到目标列表
+                let toStatus;
+                if (fromStatus === 'active') {
+                    toStatus = 'blocked';
+                } else if (fromStatus === 'blocked') {
+                    toStatus = 'backup';
+                } else {
+                    toStatus = 'active';
+                }
+                config[`${toStatus}Domains`].push(domain);
+
+                await fetch(`${API_BASE_URL}/api/config`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                displayDomains(config);
+            } catch (error) {
+                console.error('移动域名失败:', error);
+                alert('移动域名失败，请检查网络连接');
+            }
+        }
+
+        // 删除域名
+        async function deleteDomain(domain, status) {
+            if (!confirm(`确定要删除域名 ${domain} 吗？`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/config`);
+                const config = await response.json();
+                
+                config[`${status}Domains`] = config[`${status}Domains`].filter(d => d !== domain);
+
+                await fetch(`${API_BASE_URL}/api/config`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                displayDomains(config);
+            } catch (error) {
+                console.error('删除域名失败:', error);
+                alert('删除域名失败，请检查网络连接');
+            }
+        }
+
+        // 保存更改
+        async function saveChanges() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/config`);
+                const config = await response.json();
+                
+                await fetch(`${API_BASE_URL}/api/config`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                alert('保存成功！');
+            } catch (error) {
+                console.error('保存失败:', error);
+                alert('保存失败，请检查网络连接');
+            }
+        }
+
+        // 验证域名格式
+        function isValidDomain(domain) {
+            const pattern = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9](?:\.[a-zA-Z]{2,})+$/;
+            return pattern.test(domain);
+        }
+
+        // 页面加载时获取域名列表
+        window.onload = loadDomains;
+    </script>
+</body>
+</html> 
