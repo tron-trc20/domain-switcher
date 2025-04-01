@@ -3,7 +3,22 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
 const mongoose = require('mongoose');
-const Domain = require('./models/domain');
+
+// 导入模型并检查是否正确加载
+let Domain;
+try {
+  Domain = require('./models/domain');
+  console.log('模型已成功加载，类型:', typeof Domain, Domain.modelName);
+} catch (error) {
+  console.error('模型加载错误:', error);
+  // 如果模型加载失败，创建一个临时模型
+  const domainSchema = new mongoose.Schema({
+    url: { type: String, required: true },
+    enabled: { type: Boolean, default: true },
+    createdAt: { type: Date, default: Date.now }
+  });
+  Domain = mongoose.model('Domain', domainSchema);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -156,18 +171,29 @@ app.post('/api/domains', requireAuth, async (req, res) => {
       url = 'https://' + url;
     }
 
-    console.log('添加域名:', url);
-    const domain = new Domain({ url });
-    await domain.save();
+    console.log('添加域名尝试:', url);
     
-    res.status(201).json({ message: '域名添加成功', domain });
-  } catch (error) {
-    console.error('添加域名错误:', error);
-    if (error.code === 11000) { // MongoDB重复键错误
-      res.status(400).json({ error: '该域名已存在' });
-    } else {
-      res.status(500).json({ error: '添加域名失败: ' + error.message });
+    // 检查域名是否已存在
+    const existingDomain = await Domain.findOne({ url });
+    if (existingDomain) {
+      console.log('域名已存在:', url);
+      return res.status(400).json({ error: '该域名已存在' });
     }
+
+    // 创建新域名
+    const domain = new Domain({ url });
+    const savedDomain = await domain.save();
+    console.log('域名添加成功:', savedDomain);
+    
+    res.status(201).json({ message: '域名添加成功', domain: savedDomain });
+  } catch (error) {
+    console.error('添加域名错误详情:', error);
+    // 返回详细的错误信息
+    res.status(500).json({ 
+      error: '添加域名失败',
+      details: error.message,
+      code: error.code || 'unknown'
+    });
   }
 });
 
@@ -175,19 +201,21 @@ app.post('/api/domains', requireAuth, async (req, res) => {
 app.post('/api/domains/batch', requireAuth, async (req, res) => {
   try {
     let { urls } = req.body;
-    if (!urls || !Array.isArray(urls) || urls.length === 0) {
+    console.log('接收到的批量域名数据:', req.body);
+    
+    if (typeof req.body.urls === 'string') {
       // 尝试从文本框解析多行输入
-      if (typeof req.body.urls === 'string') {
-        urls = req.body.urls.split('\n').map(url => url.trim()).filter(url => url.length > 0);
-      }
+      urls = req.body.urls.split('\n')
+        .map(url => url.trim())
+        .filter(url => url.length > 0);
       
-      if (!urls || urls.length === 0) {
-        return res.status(400).json({ error: '域名列表不能为空' });
-      }
+      console.log('从文本解析的域名列表:', urls);
+    }
+    
+    if (!urls || urls.length === 0) {
+      return res.status(400).json({ error: '域名列表不能为空' });
     }
 
-    console.log('批量添加域名:', urls);
-    
     // 添加协议前缀
     const processedUrls = urls.map(url => {
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
@@ -196,32 +224,41 @@ app.post('/api/domains/batch', requireAuth, async (req, res) => {
       return url;
     });
     
-    const domains = processedUrls.map(url => ({ url }));
-    console.log('处理后的域名:', domains);
+    console.log('处理后的域名列表:', processedUrls);
     
-    try {
-      const result = await Domain.insertMany(domains, { ordered: false });
-      res.status(201).json({ 
-        message: `成功添加${result.length}个域名`,
-        domains: result
-      });
-    } catch (insertError) {
-      console.error('部分插入错误:', insertError);
-      if (insertError.insertedDocs && insertError.insertedDocs.length > 0) {
-        // 部分插入成功的情况
-        const successCount = insertError.insertedDocs.length;
-        res.status(207).json({
-          message: `部分域名添加成功（${successCount}/${urls.length}个）`,
-          error: '部分域名可能已存在',
-          domains: insertError.insertedDocs
-        });
-      } else {
-        throw insertError;
+    // 创建文档
+    const domains = processedUrls.map(url => ({ url }));
+    
+    // 保存到数据库
+    const savedDomains = [];
+    for (const domain of domains) {
+      try {
+        // 逐个添加域名，忽略已存在的
+        const exists = await Domain.findOne({ url: domain.url });
+        if (!exists) {
+          const newDomain = new Domain(domain);
+          const saved = await newDomain.save();
+          savedDomains.push(saved);
+        }
+      } catch (innerError) {
+        console.error(`添加域名 ${domain.url} 失败:`, innerError);
       }
+    }
+    
+    if (savedDomains.length > 0) {
+      res.status(201).json({
+        message: `成功添加${savedDomains.length}个域名`,
+        domains: savedDomains
+      });
+    } else {
+      res.status(400).json({ error: '所有域名都已存在或添加失败' });
     }
   } catch (error) {
     console.error('批量添加域名错误:', error);
-    res.status(500).json({ error: '批量添加域名失败: ' + error.message });
+    res.status(500).json({ 
+      error: '批量添加域名失败',
+      details: error.message
+    });
   }
 });
 
