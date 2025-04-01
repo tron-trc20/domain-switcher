@@ -1,9 +1,9 @@
-from flask import Flask, jsonify, request, send_from_directory, render_template_string
+from flask import Flask, jsonify, request, render_template_string
 from flask_cors import CORS
 import json
 import os
 
-app = Flask(__name__, static_folder='../frontend')
+app = Flask(__name__)
 CORS(app)
 
 # 配置文件路径
@@ -156,7 +156,19 @@ def redirect():
         </html>
         ''')
     
-    # 直接跳转到第一个可用域名
+    # 获取当前域名
+    current_domain = request.headers.get('Host', '').split(':')[0]
+    
+    # 如果当前域名在可用域名列表中，保持在当前域名
+    if current_domain in config['activeDomains']:
+        return f'<script>window.location.href = "https://{current_domain}";</script>'
+    
+    # 如果当前域名在禁用域名列表中，跳转到下一个可用域名
+    if current_domain in config['blockedDomains']:
+        next_domain = config['activeDomains'][0]
+        return f'<script>window.location.href = "https://{next_domain}";</script>'
+    
+    # 如果当前域名不在任何列表中，跳转到第一个可用域名
     return f'<script>window.location.href = "https://{config["activeDomains"][0]}";</script>'
 
 # 管理后台
