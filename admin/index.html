@@ -76,7 +76,8 @@
             <form id="addDomainForm">
               <div class="mb-3">
                 <label for="domainUrl" class="form-label">域名URL</label>
-                <input type="url" class="form-control" id="domainUrl" placeholder="https://example.com" required>
+                <input type="text" class="form-control" id="domainUrl" placeholder="example.com 或 https://example.com" required>
+                <div class="form-text">可以输入不带协议的域名，系统会自动添加https://</div>
               </div>
               <button type="submit" class="btn btn-primary">添加</button>
             </form>
@@ -91,7 +92,8 @@
             <form id="bulkAddForm">
               <div class="mb-3">
                 <label for="bulkDomains" class="form-label">域名URL列表</label>
-                <textarea class="form-control" id="bulkDomains" rows="4" placeholder="每行一个域名，例如：&#10;https://example1.com&#10;https://example2.com" required></textarea>
+                <textarea class="form-control" id="bulkDomains" rows="4" placeholder="每行一个域名，例如：&#10;example1.com&#10;example2.com" required></textarea>
+                <div class="form-text">可以输入不带协议的域名，系统会自动添加https://</div>
               </div>
               <button type="submit" class="btn btn-primary">批量添加</button>
             </form>
@@ -289,22 +291,14 @@
           return;
         }
         
-        const urls = bulkDomains.split('\n')
-          .map(line => line.trim())
-          .filter(line => line.length > 0);
-        
-        if (urls.length === 0) {
-          showAlert('error', '没有有效的域名');
-          return;
-        }
-        
         try {
+          // 直接发送文本内容，让服务器处理解析
           const response = await fetch(`${API_URL}/batch`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ urls })
+            body: JSON.stringify({ urls: bulkDomains })
           });
           
           if (!response.ok) {
@@ -313,7 +307,7 @@
           }
           
           const result = await response.json();
-          showAlert('success', `成功添加${result.domains.length}个域名`);
+          showAlert('success', result.message || `成功添加域名`);
           bulkAddForm.reset();
           loadDomains();
         } catch (error) {
