@@ -4,21 +4,16 @@ const cors = require('cors');
 const path = require('path');
 const mongoose = require('mongoose');
 
-// 导入模型并检查是否正确加载
-let Domain;
-try {
-  Domain = require('./models/domain');
-  console.log('模型已成功加载，类型:', typeof Domain, Domain.modelName);
-} catch (error) {
-  console.error('模型加载错误:', error);
-  // 如果模型加载失败，创建一个临时模型
-  const domainSchema = new mongoose.Schema({
-    url: { type: String, required: true },
-    enabled: { type: Boolean, default: true },
-    createdAt: { type: Date, default: Date.now }
-  });
-  Domain = mongoose.model('Domain', domainSchema);
-}
+// 直接定义域名模型
+const domainSchema = new mongoose.Schema({
+  url: { type: String, required: true },
+  enabled: { type: Boolean, default: true },
+  createdAt: { type: Date, default: Date.now }
+});
+
+// 确保模型名称的一致性（首字母大写）
+const Domain = mongoose.model('Domain', domainSchema);
+console.log('Mongoose模型已创建:', Domain.modelName);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
