@@ -108,14 +108,66 @@ app.get('/', async (req, res) => {
     if (enabledDomains.length > 0) {
       const targetUrl = enabledDomains[0].url;
       console.log('将跳转到:', targetUrl);
-      return res.redirect(targetUrl);
+      
+      // 确保URL是绝对URL，并且有协议前缀
+      let redirectUrl = targetUrl;
+      if (!redirectUrl.startsWith('http://') && !redirectUrl.startsWith('https://')) {
+        redirectUrl = 'https://' + redirectUrl;
+      }
+      
+      console.log('最终重定向URL:', redirectUrl);
+      return res.redirect(302, redirectUrl);
     } else {
       console.log('没有可用的跳转域名');
-      return res.send('没有可用的跳转域名');
+      return res.status(404).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>没有可用域名</title>
+          <meta charset="UTF-8">
+          <style>
+            body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .error { color: #721c24; background-color: #f8d7da; padding: 20px; border-radius: 5px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="error">
+              <h1>没有可用的跳转域名</h1>
+              <p>管理员尚未添加任何可用域名，请联系管理员。</p>
+              <p><a href="/admin">访问管理后台</a></p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `);
     }
   } catch (error) {
     console.error('重定向错误:', error);
-    res.status(500).send('服务器错误: ' + error.message);
+    res.status(500).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>服务器错误</title>
+        <meta charset="UTF-8">
+        <style>
+          body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .error { color: #721c24; background-color: #f8d7da; padding: 20px; border-radius: 5px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="error">
+            <h1>服务器错误</h1>
+            <p>域名跳转服务出现问题，请稍后再试。</p>
+            <p>错误详情: ${error.message}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `);
   }
 });
 
@@ -322,7 +374,7 @@ app.delete('/api/domains/:id', requireAuth, async (req, res) => {
   }
 });
 
-// API - 公共获取第一个启用的域名（不需要登录）
+// API - 获取第一个启用的域名（不需要登录）
 app.get('/api/first-domain', async (req, res) => {
   try {
     const enabledDomains = await Domain.find({ enabled: true }).sort({ createdAt: 1 });
@@ -335,6 +387,30 @@ app.get('/api/first-domain', async (req, res) => {
   } catch (error) {
     console.error('获取域名错误:', error);
     res.status(500).json({ error: '获取域名失败' });
+  }
+});
+
+// API - 清理数据库中显示为undefined的域名（需要登录）
+app.post('/api/clean-undefined', requireAuth, async (req, res) => {
+  try {
+    // 查找url为undefined或为空的域名并删除
+    const result = await Domain.deleteMany({
+      $or: [
+        { url: 'undefined' },
+        { url: null },
+        { url: '' }
+      ]
+    });
+    
+    console.log('清理结果:', result);
+    
+    res.json({ 
+      message: `成功清理了${result.deletedCount}个无效域名`, 
+      deletedCount: result.deletedCount 
+    });
+  } catch (error) {
+    console.error('清理域名错误:', error);
+    res.status(500).json({ error: '清理无效域名失败', details: error.message });
   }
 });
 

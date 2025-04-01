@@ -106,6 +106,9 @@
     <div class="alert alert-danger" id="errorAlert" role="alert"></div>
     
     <h2 class="mt-4">域名列表</h2>
+    <div class="mb-3">
+      <button id="cleanUndefinedBtn" class="btn btn-warning">清理无效域名</button>
+    </div>
     <div id="domainList" class="domain-list">
       <div class="loading">
         <div class="loader"></div>
@@ -121,6 +124,7 @@
       const bulkAddForm = document.getElementById('bulkAddForm');
       const successAlert = document.getElementById('successAlert');
       const errorAlert = document.getElementById('errorAlert');
+      const cleanUndefinedBtn = document.getElementById('cleanUndefinedBtn');
       
       // 显示提示消息
       function showAlert(type, message) {
@@ -318,6 +322,37 @@
       
       // 初始加载
       loadDomains();
+      
+      // 清理无效域名
+      cleanUndefinedBtn.addEventListener('click', async () => {
+        if (!confirm('确定要清理所有无效域名吗？这将删除所有显示为undefined的域名。')) {
+          return;
+        }
+        
+        try {
+          cleanUndefinedBtn.textContent = '清理中...';
+          cleanUndefinedBtn.disabled = true;
+          
+          const response = await fetch('/api/clean-undefined', {
+            method: 'POST'
+          });
+          
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || '清理无效域名失败');
+          }
+          
+          const result = await response.json();
+          showAlert('success', result.message || '成功清理无效域名');
+          loadDomains();
+        } catch (error) {
+          console.error('清理无效域名错误:', error);
+          showAlert('error', error.message);
+        } finally {
+          cleanUndefinedBtn.textContent = '清理无效域名';
+          cleanUndefinedBtn.disabled = false;
+        }
+      });
     });
   </script>
 </body>
