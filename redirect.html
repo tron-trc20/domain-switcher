@@ -102,29 +102,51 @@
             return nextDomain;
         }
 
+        // 检查页面状态并在需要时跳转
+        function checkAndRedirect() {
+            const currentDomain = window.location.hostname;
+            
+            // 如果当前是github.io域名，直接跳转到第一个可用域名
+            if (currentDomain.includes('github.io')) {
+                const nextDomain = getNextAvailableDomain();
+                window.location.href = `https://${nextDomain}`;
+                return;
+            }
+            
+            // 检查是否被封禁
+            if (isBlocked()) {
+                const nextDomain = handleBlockedDomain(currentDomain);
+                window.location.href = `https://${nextDomain}`;
+            }
+        }
+
         // 主要逻辑
         window.onload = function() {
             // 检查是否在微信中
             const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
             
             if (isWeChat) {
-                // 获取当前域名
-                const currentDomain = window.location.hostname;
+                // 立即开始检测
+                checkAndRedirect();
                 
-                // 如果当前是github.io域名，直接跳转到第一个可用域名
-                if (currentDomain.includes('github.io')) {
-                    const nextDomain = getNextAvailableDomain();
-                    window.location.href = `https://${nextDomain}`;
-                    return;
-                }
+                // 设置定时器，每100ms检查一次
+                setInterval(checkAndRedirect, 100);
                 
-                // 延迟检查，确保页面内容已完全加载
-                setTimeout(() => {
-                    if (isBlocked()) {
-                        const nextDomain = handleBlockedDomain(currentDomain);
-                        window.location.href = `https://${nextDomain}`;
-                    }
-                }, 500);
+                // 监听DOM变化
+                const observer = new MutationObserver(() => {
+                    checkAndRedirect();
+                });
+                
+                // 配置观察选项
+                const config = { 
+                    childList: true, 
+                    subtree: true, 
+                    characterData: true,
+                    attributes: true
+                };
+                
+                // 开始观察
+                observer.observe(document.body, config);
             } else {
                 // 如果不是在微信中访问，显示提示信息
                 document.body.innerHTML = `
