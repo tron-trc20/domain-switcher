@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>二维码生成器</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f5f5f5;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            text-align: center;
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        #qrcode {
+            margin: 20px auto;
+            position: relative;
+            width: 256px;
+            height: 256px;
+        }
+        #qrcode img.logo {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px;
+            height: 50px;
+            z-index: 2;
+            background: white;
+            padding: 5px;
+            border-radius: 50%;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>域名切换二维码</h1>
+        <div id="qrcode"></div>
+        <button onclick="downloadQR()">下载二维码</button>
+    </div>
+
+    <script>
+        // 生成二维码
+        window.onload = function() {
+            const qrcode = new QRCode(document.getElementById("qrcode"), {
+                text: "https://tron-trc20.github.io/domain-switcher/redirect.html",
+                width: 256,
+                height: 256,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+
+            // 添加Logo
+            setTimeout(() => {
+                const img = document.createElement('img');
+                img.src = 'logo.png';  // 直接引用logo.png文件
+                img.className = 'logo';
+                img.onload = function() {
+                    document.getElementById("qrcode").appendChild(img);
+                }
+            }, 100);
+        };
+
+        // 下载二维码
+        function downloadQR() {
+            const canvas = document.querySelector("#qrcode canvas");
+            const img = document.querySelector("#qrcode img.logo");
+            
+            // 创建一个新的canvas来合成图片
+            const compositeCanvas = document.createElement('canvas');
+            const ctx = compositeCanvas.getContext('2d');
+            
+            // 设置canvas大小
+            compositeCanvas.width = canvas.width;
+            compositeCanvas.height = canvas.height;
+            
+            // 绘制QR码
+            ctx.drawImage(canvas, 0, 0);
+            
+            // 绘制Logo
+            const logoSize = 50;
+            const padding = 5;
+            const totalSize = logoSize + (padding * 2);
+            const logoX = (canvas.width - logoSize) / 2;
+            const logoY = (canvas.height - logoSize) / 2;
+            
+            // 绘制白色背景圆
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(canvas.width/2, canvas.height/2, totalSize/2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 绘制Logo
+            ctx.drawImage(img, logoX, logoY, logoSize, logoSize);
+            
+            // 创建下载链接
+            const link = document.createElement('a');
+            link.download = '二维码.png';
+            link.href = compositeCanvas.toDataURL();
+            link.click();
+        }
+    </script>
+</body>
+</html> 

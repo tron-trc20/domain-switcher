@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>域名切换</title>
+    <script src="config.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+            background-color: #f5f5f5;
+        }
+        .loading {
+            margin-top: 50px;
+            font-size: 18px;
+            color: #333;
+        }
+        .error {
+            margin-top: 20px;
+            color: #dc3545;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading">正在加载...</div>
+    <div class="error" style="display: none;"></div>
+
+    <script>
+        // 获取当前域名索引
+        function getCurrentIndex() {
+            const index = localStorage.getItem('currentDomainIndex');
+            return index ? parseInt(index) : 0;
+        }
+
+        // 保存当前域名索引
+        function saveCurrentIndex(index) {
+            localStorage.setItem('currentDomainIndex', index.toString());
+        }
+
+        // 获取下一个可用域名
+        function getNextDomain() {
+            const domains = CONFIG.activeDomains;
+            if (domains.length === 0) {
+                throw new Error('没有可用的域名');
+            }
+            
+            let currentIndex = getCurrentIndex();
+            currentIndex = (currentIndex + 1) % domains.length;
+            saveCurrentIndex(currentIndex);
+            
+            return domains[currentIndex];
+        }
+
+        // 检查是否在微信中打开
+        function isWechat() {
+            const ua = navigator.userAgent.toLowerCase();
+            return ua.indexOf('micromessenger') !== -1;
+        }
+
+        // 主函数
+        function main() {
+            if (!isWechat()) {
+                document.querySelector('.loading').style.display = 'none';
+                document.querySelector('.error').style.display = 'block';
+                document.querySelector('.error').textContent = '请在微信中打开此链接';
+                return;
+            }
+
+            try {
+                const currentDomain = window.location.hostname;
+                
+                // 如果当前是 GitHub Pages 域名，直接跳转到第一个可用域名
+                if (currentDomain.includes('github.io')) {
+                    if (CONFIG.activeDomains.length > 0) {
+                        window.location.href = `https://${CONFIG.activeDomains[0]}`;
+                    } else {
+                        throw new Error('没有可用的域名');
+                    }
+                    return;
+                }
+
+                // 如果当前域名不在可用列表中，切换到下一个
+                if (!CONFIG.activeDomains.includes(currentDomain)) {
+                    const nextDomain = getNextDomain();
+                    window.location.href = `https://${nextDomain}`;
+                    return;
+                }
+
+                // 监控页面变化
+                const observer = new MutationObserver((mutations) => {
+                    for (const mutation of mutations) {
+                        const nodes = Array.from(mutation.addedNodes);
+                        for (const node of nodes) {
+                            if (node.nodeType === 1) { // 元素节点
+                                const text = node.textContent || '';
+                                if (text.includes('网页无法打开') || text.includes('系统繁忙')) {
+                                    const nextDomain = getNextDomain();
+                                    window.location.href = `https://${nextDomain}`;
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                });
+
+                observer.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+
+            } catch (error) {
+                document.querySelector('.loading').style.display = 'none';
+                document.querySelector('.error').style.display = 'block';
+                document.querySelector('.error').textContent = error.message;
+            }
+        }
+
+        // 页面加载完成后执行
+        window.onload = main;
+    </script>
+</body>
+</html> 

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>域名测试二维码</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <style>
+        .qr-container {
+            display: inline-block;
+            margin: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .domain-name {
+            margin-top: 5px;
+            font-size: 12px;
+            word-break: break-all;
+            max-width: 150px;
+        }
+    </style>
+</head>
+<body>
+    <h1>域名测试二维码</h1>
+    <div id="qr-codes"></div>
+
+    <script>
+        const domains = [
+            "cnrenlizi.com",
+            "a.cnrenlizi.com",
+            "b.cnrenlizi.com",
+            "c.cnrenlizi.com",
+            "d.cnrenlizi.com",
+            "e.cnrenlizi.com",
+            "f.cnrenlizi.com",
+            "g.cnrenlizi.com",
+            "h.cnrenlizi.com",
+            "i.cnrenlizi.com",
+            "j.cnrenlizi.com",
+            "k.cnrenlizi.com",
+            "l.cnrenlizi.com",
+            "m.cnrenlizi.com",
+            "n.cnrenlizi.com",
+            "o.cnrenlizi.com",
+            "p.cnrenlizi.com",
+            "q.cnrenlizi.com",
+            "r.cnrenlizi.com",
+            "s.cnrenlizi.com",
+            "t.cnrenlizi.com",
+            "u.cnrenlizi.com",
+            "v.cnrenlizi.com",
+            "w.cnrenlizi.com",
+            "x.cnrenlizi.com",
+            "y.cnrenlizi.com",
+            "z.cnrenlizi.com"
+        ];
+
+        const container = document.getElementById('qr-codes');
+        
+        domains.forEach(domain => {
+            const url = `https://${domain}`;
+            
+            // 创建容器
+            const qrContainer = document.createElement('div');
+            qrContainer.className = 'qr-container';
+            
+            // 创建QR码的div
+            const qrDiv = document.createElement('div');
+            qrContainer.appendChild(qrDiv);
+            
+            // 创建域名标签
+            const domainLabel = document.createElement('div');
+            domainLabel.className = 'domain-name';
+            domainLabel.textContent = domain;
+            qrContainer.appendChild(domainLabel);
+            
+            // 添加到主容器
+            container.appendChild(qrContainer);
+            
+            // 生成QR码
+            new QRCode(qrDiv, {
+                text: url,
+                width: 128,
+                height: 128,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        });
+    </script>
+</body>
+</html> 
