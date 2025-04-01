@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 // 直接硬编码MongoDB连接字符串（生产环境中通常不推荐，但为了解决当前问题）
-const MONGODB_URI = 'mongodb+srv://panzer:panzer@cluster0.yacqmwk.mongodb.net/domain_manager?retryWrites=true&w=majority&appName=Cluster0';
+const MONGODB_URI = 'mongodb+srv://panzer:Aa563214aa%2E@cluster0.yacqmwk.mongodb.net/domain_manager?retryWrites=true&w=majority&appName=Cluster0';
 
 // 连接MongoDB
 mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
