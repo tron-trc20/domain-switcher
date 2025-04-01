@@ -19,58 +19,49 @@
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        .domain-list {
+        .domain-section {
             margin: 20px 0;
+            padding: 15px;
             border: 1px solid #ddd;
             border-radius: 5px;
         }
+        .domain-section h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .domain-list {
+            list-style: none;
+            padding: 0;
+        }
         .domain-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px;
+            padding: 10px;
             border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
         .domain-item:last-child {
             border-bottom: none;
         }
-        .domain-info {
+        .domain-name {
             flex: 1;
-        }
-        .domain-url {
-            font-size: 16px;
-            margin-bottom: 5px;
-        }
-        .domain-status {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 3px;
-            font-size: 12px;
-            margin-left: 10px;
+            font-family: monospace;
         }
         .status-active {
-            background-color: #e6f4ea;
-            color: #1e8e3e;
+            color: #28a745;
         }
         .status-blocked {
-            background-color: #fce8e6;
-            color: #d93025;
+            color: #dc3545;
         }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 8px 15px;
-            border: none;
+        .status-backup {
+            color: #6c757d;
+        }
+        .instructions {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f8f9fa;
             border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            margin-left: 10px;
-        }
-        button:hover {
-            opacity: 0.9;
-        }
-        button.block {
-            background-color: #dc3545;
+            line-height: 1.6;
         }
         .header {
             display: flex;
@@ -89,6 +80,94 @@
         .qr-link:hover {
             background-color: #0056b3;
         }
+        .domain-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            color: white;
+        }
+        .btn:hover {
+            opacity: 0.9;
+        }
+        .btn-move {
+            background-color: #6c757d;
+        }
+        .btn-delete {
+            background-color: #dc3545;
+        }
+        .add-domain {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+        }
+        .add-domain textarea {
+            width: 100%;
+            height: 100px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            margin-bottom: 10px;
+            font-family: monospace;
+            resize: vertical;
+        }
+        .add-domain .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .add-domain input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            width: 200px;
+        }
+        .add-domain select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        .add-domain button {
+            padding: 8px 15px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .add-domain button:hover {
+            background-color: #218838;
+        }
+        .add-domain .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .move-menu {
+            display: none;
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        .move-menu.show {
+            display: block;
+        }
+        .move-menu-item {
+            padding: 8px 15px;
+            cursor: pointer;
+        }
+        .move-menu-item:hover {
+            background-color: #f8f9fa;
+        }
     </style>
 </head>
 <body>
@@ -97,73 +176,287 @@
             <h1>域名管理后台</h1>
             <a href="index.html" class="qr-link">查看二维码</a>
         </div>
-        <div class="domain-list" id="domainList"></div>
+
+        <div class="instructions">
+            <h3>域名管理说明：</h3>
+            <p>1. 当域名被微信封禁时，请将其移动到"已禁用域名"列表</p>
+            <p>2. 可以通过单个添加或批量添加来添加新域名</p>
+            <p>3. 可以通过"移动"按钮在不同状态之间移动域名</p>
+            <p>4. 修改完成后，点击"保存更改"按钮提交到 GitHub</p>
+        </div>
+
+        <div class="add-domain">
+            <h3>添加新域名</h3>
+            <div class="input-group">
+                <input type="text" id="newDomain" placeholder="输入单个域名（例如：example.com）">
+                <select id="domainStatus">
+                    <option value="active">可用域名</option>
+                    <option value="backup">备用域名</option>
+                </select>
+                <button onclick="addNewDomain()">添加单个域名</button>
+            </div>
+            <div style="margin: 15px 0;">
+                <strong>或</strong>
+            </div>
+            <textarea id="batchDomains" placeholder="批量添加域名，每行一个域名，例如：
+example1.com
+example2.com
+example3.com"></textarea>
+            <div class="input-group">
+                <select id="batchDomainStatus">
+                    <option value="active">可用域名</option>
+                    <option value="backup">备用域名</option>
+                </select>
+                <button onclick="addBatchDomains()">批量添加域名</button>
+            </div>
+            <div class="help-text">
+                提示：批量添加时，每行输入一个域名，系统会自动过滤重复和无效的域名
+            </div>
+        </div>
+
+        <div class="domain-section">
+            <h2>当前可用域名</h2>
+            <ul class="domain-list" id="activeDomains"></ul>
+        </div>
+
+        <div class="domain-section">
+            <h2>已禁用域名</h2>
+            <ul class="domain-list" id="blockedDomains"></ul>
+        </div>
+
+        <div class="domain-section">
+            <h2>备用域名</h2>
+            <ul class="domain-list" id="backupDomains"></ul>
+        </div>
+
+        <div style="text-align: center; margin-top: 20px;">
+            <button onclick="saveChanges()" style="padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                保存更改
+            </button>
+        </div>
+    </div>
+
+    <div class="move-menu" id="moveMenu">
+        <div class="move-menu-item" onclick="moveDomain('active')">移动到可用域名</div>
+        <div class="move-menu-item" onclick="moveDomain('blocked')">移动到已禁用域名</div>
+        <div class="move-menu-item" onclick="moveDomain('backup')">移动到备用域名</div>
     </div>
 
     <script>
-        // 从 localStorage 获取域名状态
-        function getDomainStatuses() {
-            const statuses = localStorage.getItem('domainStatuses');
-            return statuses ? JSON.parse(statuses) : {};
+        let currentDomain = null;
+        let currentStatus = null;
+
+        // 添加新域名
+        function addNewDomain() {
+            const input = document.getElementById('newDomain');
+            const status = document.getElementById('domainStatus').value;
+            const domain = input.value.trim();
+
+            if (!domain) {
+                alert('请输入域名');
+                return;
+            }
+
+            if (!isValidDomain(domain)) {
+                alert('请输入有效的域名');
+                return;
+            }
+
+            // 检查域名是否已存在
+            if (CONFIG.activeDomains.includes(domain) || 
+                CONFIG.blockedDomains.includes(domain) || 
+                CONFIG.backupDomains.includes(domain)) {
+                alert('该域名已存在');
+                return;
+            }
+
+            // 添加到对应列表
+            if (status === 'active') {
+                CONFIG.activeDomains.push(domain);
+            } else {
+                CONFIG.backupDomains.push(domain);
+            }
+
+            input.value = '';
+            displayDomains();
         }
 
-        // 保存域名状态到 localStorage
-        function saveDomainStatuses(statuses) {
-            localStorage.setItem('domainStatuses', JSON.stringify(statuses));
+        // 批量添加域名
+        function addBatchDomains() {
+            const textarea = document.getElementById('batchDomains');
+            const status = document.getElementById('batchDomainStatus').value;
+            const domains = textarea.value.split('\n')
+                .map(d => d.trim())
+                .filter(d => d && isValidDomain(d));
+
+            if (domains.length === 0) {
+                alert('请输入有效的域名');
+                return;
+            }
+
+            const existingDomains = new Set([
+                ...CONFIG.activeDomains,
+                ...CONFIG.blockedDomains,
+                ...CONFIG.backupDomains
+            ]);
+
+            const newDomains = domains.filter(d => !existingDomains.has(d));
+
+            if (newDomains.length === 0) {
+                alert('所有输入的域名都已存在');
+                return;
+            }
+
+            if (status === 'active') {
+                CONFIG.activeDomains.push(...newDomains);
+            } else {
+                CONFIG.backupDomains.push(...newDomains);
+            }
+
+            textarea.value = '';
+            displayDomains();
+            alert(`成功添加 ${newDomains.length} 个新域名`);
         }
 
-        // 初始化域名状态
-        function initializeDomainStatuses() {
-            const statuses = getDomainStatuses();
-            CONFIG.domains.forEach(domain => {
-                if (!(domain in statuses)) {
-                    statuses[domain] = true; // 默认启用
-                }
-            });
-            saveDomainStatuses(statuses);
-            return statuses;
+        // 验证域名格式
+        function isValidDomain(domain) {
+            const pattern = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9](?:\.[a-zA-Z]{2,})+$/;
+            return pattern.test(domain);
         }
 
-        // 更新域名列表显示
-        function updateDomainList() {
-            const statuses = getDomainStatuses();
-            const container = document.getElementById('domainList');
-            container.innerHTML = '';
+        // 显示移动菜单
+        function showMoveMenu(domain, status, event) {
+            currentDomain = domain;
+            currentStatus = status;
+            
+            const menu = document.getElementById('moveMenu');
+            menu.style.left = event.clientX + 'px';
+            menu.style.top = event.clientY + 'px';
+            menu.classList.add('show');
+        }
 
-            CONFIG.domains.forEach(domain => {
-                const isActive = statuses[domain] !== false;
-                const item = document.createElement('div');
-                item.className = 'domain-item';
-                item.innerHTML = `
-                    <div class="domain-info">
-                        <div class="domain-url">
-                            ${domain}
-                            <span class="domain-status ${isActive ? 'status-active' : 'status-blocked'}">
-                                ${isActive ? '正常' : '已禁用'}
-                            </span>
-                        </div>
+        // 隐藏移动菜单
+        function hideMoveMenu() {
+            document.getElementById('moveMenu').classList.remove('show');
+        }
+
+        // 移动域名
+        function moveDomain(targetStatus) {
+            if (!currentDomain) return;
+
+            // 从原列表中移除
+            CONFIG.activeDomains = CONFIG.activeDomains.filter(d => d !== currentDomain);
+            CONFIG.blockedDomains = CONFIG.blockedDomains.filter(d => d !== currentDomain);
+            CONFIG.backupDomains = CONFIG.backupDomains.filter(d => d !== currentDomain);
+
+            // 添加到目标列表
+            if (targetStatus === 'active') {
+                CONFIG.activeDomains.push(currentDomain);
+            } else if (targetStatus === 'blocked') {
+                CONFIG.blockedDomains.push(currentDomain);
+            } else {
+                CONFIG.backupDomains.push(currentDomain);
+            }
+
+            hideMoveMenu();
+            displayDomains();
+        }
+
+        // 删除域名
+        function deleteDomain(domain) {
+            if (!confirm(`确定要删除域名 ${domain} 吗？`)) return;
+
+            CONFIG.activeDomains = CONFIG.activeDomains.filter(d => d !== domain);
+            CONFIG.blockedDomains = CONFIG.blockedDomains.filter(d => d !== domain);
+            CONFIG.backupDomains = CONFIG.backupDomains.filter(d => d !== domain);
+
+            displayDomains();
+        }
+
+        function displayDomains() {
+            // 显示当前可用域名
+            const activeList = document.getElementById('activeDomains');
+            activeList.innerHTML = CONFIG.activeDomains.map(domain => `
+                <li class="domain-item">
+                    <span class="domain-name status-active">${domain}</span>
+                    <div class="domain-actions">
+                        <button class="btn btn-move" onclick="showMoveMenu('${domain}', 'active', event)">移动</button>
+                        <button class="btn btn-delete" onclick="deleteDomain('${domain}')">删除</button>
                     </div>
-                    <button onclick="toggleDomain('${domain}')" class="${isActive ? 'block' : ''}">
-                        ${isActive ? '禁用' : '启用'}
-                    </button>
-                `;
-                container.appendChild(item);
-            });
+                </li>
+            `).join('');
+
+            // 显示已禁用域名
+            const blockedList = document.getElementById('blockedDomains');
+            if (CONFIG.blockedDomains.length === 0) {
+                blockedList.innerHTML = '<li class="domain-item"><em>暂无禁用域名</em></li>';
+            } else {
+                blockedList.innerHTML = CONFIG.blockedDomains.map(domain => `
+                    <li class="domain-item">
+                        <span class="domain-name status-blocked">${domain}</span>
+                        <div class="domain-actions">
+                            <button class="btn btn-move" onclick="showMoveMenu('${domain}', 'blocked', event)">移动</button>
+                            <button class="btn btn-delete" onclick="deleteDomain('${domain}')">删除</button>
+                        </div>
+                    </li>
+                `).join('');
+            }
+
+            // 显示备用域名
+            const backupList = document.getElementById('backupDomains');
+            if (CONFIG.backupDomains.length === 0) {
+                backupList.innerHTML = '<li class="domain-item"><em>暂无备用域名</em></li>';
+            } else {
+                backupList.innerHTML = CONFIG.backupDomains.map(domain => `
+                    <li class="domain-item">
+                        <span class="domain-name status-backup">${domain}</span>
+                        <div class="domain-actions">
+                            <button class="btn btn-move" onclick="showMoveMenu('${domain}', 'backup', event)">移动</button>
+                            <button class="btn btn-delete" onclick="deleteDomain('${domain}')">删除</button>
+                        </div>
+                    </li>
+                `).join('');
+            }
         }
 
-        // 切换域名状态
-        function toggleDomain(domain) {
-            const statuses = getDomainStatuses();
-            statuses[domain] = !statuses[domain];
-            saveDomainStatuses(statuses);
-            updateDomainList();
+        // 保存更改
+        function saveChanges() {
+            // 将配置转换为字符串
+            const configContent = `const CONFIG = {
+    activeDomains: ${JSON.stringify(CONFIG.activeDomains, null, 4)},
+    blockedDomains: ${JSON.stringify(CONFIG.blockedDomains, null, 4)},
+    backupDomains: ${JSON.stringify(CONFIG.backupDomains, null, 4)}
+};`;
+
+            // 创建 Blob 对象
+            const blob = new Blob([configContent], { type: 'text/javascript' });
+            
+            // 创建下载链接
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'config.js';
+            
+            // 触发下载
+            document.body.appendChild(a);
+            a.click();
+            
+            // 清理
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            alert('配置已保存，请将文件提交到 GitHub');
         }
 
-        // 页面加载时初始化
-        window.onload = function() {
-            initializeDomainStatuses();
-            updateDomainList();
-        };
+        // 页面加载时显示域名列表
+        window.onload = displayDomains;
+
+        // 点击其他地方时隐藏移动菜单
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.btn-move') && !event.target.closest('.move-menu')) {
+                hideMoveMenu();
+            }
+        });
     </script>
 </body>
 </html> 
