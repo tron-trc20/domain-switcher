@@ -142,52 +142,67 @@ def index():
 # 重定向页面
 @app.route('/redirect')
 def redirect():
-    config = load_config()
-    # 获取可用域名列表（排除已禁用的域名）
-    available_domains = [d for d in config['activeDomains'] if d not in config['blockedDomains']]
-    
-    if not available_domains:
+    try:
+        app.logger.debug('开始处理重定向请求')
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                content = f.read()
+                app.logger.debug(f'配置文件内容: {content}')
+                config_str = content.split('CONFIG = ')[1].strip().rstrip(';')
+                config = json.loads(config_str)
+                app.logger.debug(f'解析后的配置: {config}')
+                
+                # 获取可用域名列表
+                available_domains = [d for d in config['activeDomains'] if d not in config['blockedDomains']]
+                app.logger.debug(f'可用域名列表: {available_domains}')
+                
+                if available_domains:
+                    target_domain = available_domains[0]
+                    app.logger.debug(f'重定向到域名: {target_domain}')
+                    return f'<script>window.location.href = "https://{target_domain}";</script>'
+        
+        app.logger.warning('没有可用的域名')
         return render_template_string('''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <title>错误</title>
-            <style>
-                body {
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    min-height: 100vh;
-                    margin: 0;
-                    background-color: #f5f5f5;
-                    font-family: Arial, sans-serif;
-                }
-                .container {
-                    text-align: center;
-                    background: white;
-                    padding: 2rem;
-                    border-radius: 10px;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                }
-                .error {
-                    color: #dc3545;
-                    margin: 10px 0;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>错误</h1>
-                <div class="error">没有可用的域名，请联系管理员</div>
-            </div>
-        </body>
-        </html>
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>错误</title>
+                <style>
+                    body {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        min-height: 100vh;
+                        margin: 0;
+                        background-color: #f5f5f5;
+                        font-family: Arial, sans-serif;
+                    }
+                    .container {
+                        text-align: center;
+                        background: white;
+                        padding: 2rem;
+                        border-radius: 10px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    }
+                    .error {
+                        color: #dc3545;
+                        margin: 10px 0;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>错误</h1>
+                    <div class="error">没有可用的域名，请联系管理员</div>
+                </div>
+            </body>
+            </html>
         ''')
-    
-    # 直接跳转到第一个可用域名
-    return f'<script>window.location.href = "https://{available_domains[0]}";</script>'
+    except Exception as e:
+        app.logger.error(f'重定向时出错: {str(e)}')
+        return str(e), 500
 
 # 管理后台
 @app.route('/admin')
@@ -198,6 +213,7 @@ def admin():
     <head>
         <meta charset="UTF-8">
         <title>域名管理后台</title>
+        <script src="/static/config.js"></script>
         <style>
             body {
                 font-family: Arial, sans-serif;
@@ -349,9 +365,8 @@ example3.com" style="width: 100%; height: 100px; margin-bottom: 10px;"></textare
             // 加载域名列表
             async function loadDomains() {
                 try {
-                    const response = await fetch(`${API_BASE_URL}/api/config`);
-                    const config = await response.json();
-                    displayDomains(config);
+                    // 直接使用CONFIG对象
+                    displayDomains(CONFIG);
                 } catch (error) {
                     console.error('加载域名失败:', error);
                     alert('加载域名失败，请检查网络连接');
