@@ -1,9 +1,9 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 import json
 import os
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='../frontend')
 CORS(app)
 
 # 配置文件路径
@@ -22,6 +22,18 @@ def load_config():
 def save_config(config):
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
+
+@app.route('/')
+def serve_index():
+    return send_from_directory(app.static_folder, 'index.html')
+
+@app.route('/admin')
+def serve_admin():
+    return send_from_directory(app.static_folder, 'admin.html')
+
+@app.route('/redirect')
+def serve_redirect():
+    return send_from_directory(app.static_folder, 'redirect.html')
 
 @app.route('/api/config', methods=['GET'])
 def get_config():

@@ -72,7 +72,7 @@ example3.com"></textarea>
     </div>
 
     <script>
-        const API_BASE_URL = 'https://your-render-app.onrender.com'; // 替换为您的Render应用URL
+        const API_BASE_URL = window.location.origin; // 使用当前域名作为API地址
 
         // 加载域名列表
         async function loadDomains() {
