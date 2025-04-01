@@ -1,29 +1,54 @@
 from flask import Flask, jsonify, request, render_template_string, send_from_directory
 import json
 import os
+import logging
 
 app = Flask(__name__)
+logging.basicConfig(level=logging.DEBUG)
 
 # 配置文件路径
-CONFIG_FILE = 'static/config.js'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_FILE = os.path.join(BASE_DIR, 'static', 'config.js')
 
 def load_config():
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-            content = f.read()
-            # 提取CONFIG对象的内容
-            config_str = content.split('CONFIG = ')[1].strip().rstrip(';')
-            return json.loads(config_str)
+    try:
+        app.logger.debug(f'尝试加载配置文件: {CONFIG_FILE}')
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                content = f.read()
+                app.logger.debug(f'配置文件内容: {content}')
+                # 提取CONFIG对象的内容
+                config_str = content.split('CONFIG = ')[1].strip().rstrip(';')
+                config = json.loads(config_str)
+                app.logger.debug(f'解析后的配置: {config}')
+                return config
+        else:
+            app.logger.warning(f'配置文件不存在: {CONFIG_FILE}')
+    except Exception as e:
+        app.logger.error(f'加载配置文件时出错: {str(e)}')
     return {"activeDomains": [], "blockedDomains": [], "backupDomains": []}
 
 def save_config(config):
-    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-        f.write(f'const CONFIG = {json.dumps(config, ensure_ascii=False, indent=4)};')
+    try:
+        app.logger.debug(f'尝试保存配置: {config}')
+        os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            content = f'const CONFIG = {json.dumps(config, ensure_ascii=False, indent=4)};'
+            f.write(content)
+            app.logger.debug('配置保存成功')
+    except Exception as e:
+        app.logger.error(f'保存配置文件时出错: {str(e)}')
+        raise
 
 # 静态文件路由
 @app.route('/static/<path:filename>')
 def serve_static(filename):
-    return send_from_directory('static', filename)
+    try:
+        app.logger.debug(f'请求静态文件: {filename}')
+        return send_from_directory(os.path.join(BASE_DIR, 'static'), filename)
+    except Exception as e:
+        app.logger.error(f'访问静态文件时出错: {str(e)}')
+        return str(e), 500
 
 # 主页（显示二维码）
 @app.route('/')
@@ -537,13 +562,24 @@ example3.com" style="width: 100%; height: 100px; margin-bottom: 10px;"></textare
 
 @app.route('/api/config', methods=['GET'])
 def get_config():
-    return jsonify(load_config())
+    try:
+        config = load_config()
+        app.logger.debug(f'获取配置: {config}')
+        return jsonify(config)
+    except Exception as e:
+        app.logger.error(f'获取配置时出错: {str(e)}')
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/config', methods=['POST'])
 def update_config():
-    config = request.json
-    save_config(config)
-    return jsonify({"status": "success"})
+    try:
+        config = request.json
+        app.logger.debug(f'更新配置: {config}')
+        save_config(config)
+        return jsonify({"status": "success"})
+    except Exception as e:
+        app.logger.error(f'更新配置时出错: {str(e)}')
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000))) 
