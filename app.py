@@ -13,24 +13,12 @@ def load_config():
             content = f.read()
             # 提取CONFIG对象的内容
             config_str = content.split('CONFIG = ')[1].strip().rstrip(';')
-            config = json.loads(config_str)
-            # 转换键名以匹配应用逻辑
-            return {
-                "domains": config.get("activeDomains", []),
-                "disabled_domains": config.get("blockedDomains", []),
-                "backup_domains": config.get("backupDomains", [])
-            }
-    return {"domains": [], "disabled_domains": [], "backup_domains": []}
+            return json.loads(config_str)
+    return {"activeDomains": [], "blockedDomains": [], "backupDomains": []}
 
 def save_config(config):
-    # 转换键名以匹配config.js的结构
-    config_js = {
-        "activeDomains": config.get("domains", []),
-        "blockedDomains": config.get("disabled_domains", []),
-        "backupDomains": config.get("backup_domains", [])
-    }
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-        f.write(f'const CONFIG = {json.dumps(config_js, ensure_ascii=False, indent=4)};')
+        f.write(f'const CONFIG = {json.dumps(config, ensure_ascii=False, indent=4)};')
 
 # 静态文件路由
 @app.route('/static/<path:filename>')
@@ -131,7 +119,7 @@ def index():
 def redirect():
     config = load_config()
     # 获取可用域名列表（排除已禁用的域名）
-    available_domains = [d for d in config['domains'] if d not in config['disabled_domains']]
+    available_domains = [d for d in config['activeDomains'] if d not in config['blockedDomains']]
     
     if not available_domains:
         return render_template_string('''
@@ -350,12 +338,12 @@ example3.com" style="width: 100%; height: 100px; margin-bottom: 10px;"></textare
                 const activeList = document.getElementById('activeDomains');
                 const blockedList = document.getElementById('blockedDomains');
 
-                activeList.innerHTML = config.domains
-                    .filter(domain => !config.disabled_domains.includes(domain))
+                activeList.innerHTML = config.activeDomains
+                    .filter(domain => !config.blockedDomains.includes(domain))
                     .map(domain => createDomainElement(domain, 'active'))
                     .join('');
 
-                blockedList.innerHTML = config.disabled_domains
+                blockedList.innerHTML = config.blockedDomains
                     .map(domain => createDomainElement(domain, 'blocked'))
                     .join('');
             }
@@ -392,12 +380,12 @@ example3.com" style="width: 100%; height: 100px; margin-bottom: 10px;"></textare
                     const response = await fetch(`${API_BASE_URL}/api/config`);
                     const config = await response.json();
                     
-                    if (config.domains.includes(domain)) {
+                    if (config.activeDomains.includes(domain)) {
                         alert('该域名已存在');
                         return;
                     }
 
-                    config.domains.push(domain);
+                    config.activeDomains.push(domain);
 
                     await fetch(`${API_BASE_URL}/api/config`, {
                         method: 'POST',
@@ -431,7 +419,7 @@ example3.com" style="width: 100%; height: 100px; margin-bottom: 10px;"></textare
                     const response = await fetch(`${API_BASE_URL}/api/config`);
                     const config = await response.json();
                     
-                    const existingDomains = new Set(config.domains);
+                    const existingDomains = new Set(config.activeDomains);
                     const newDomains = domains.filter(d => !existingDomains.has(d));
 
                     if (newDomains.length === 0) {
@@ -439,7 +427,7 @@ example3.com" style="width: 100%; height: 100px; margin-bottom: 10px;"></textare
                         return;
                     }
 
-                    config.domains.push(...newDomains);
+                    config.activeDomains.push(...newDomains);
 
                     await fetch(`${API_BASE_URL}/api/config`, {
                         method: 'POST',
@@ -465,9 +453,9 @@ example3.com" style="width: 100%; height: 100px; margin-bottom: 10px;"></textare
                     const config = await response.json();
                     
                     if (fromStatus === 'active') {
-                        config.disabled_domains.push(domain);
+                        config.blockedDomains.push(domain);
                     } else {
-                        config.disabled_domains = config.disabled_domains.filter(d => d !== domain);
+                        config.blockedDomains = config.blockedDomains.filter(d => d !== domain);
                     }
 
                     await fetch(`${API_BASE_URL}/api/config`, {
@@ -495,8 +483,8 @@ example3.com" style="width: 100%; height: 100px; margin-bottom: 10px;"></textare
                     const response = await fetch(`${API_BASE_URL}/api/config`);
                     const config = await response.json();
                     
-                    config.domains = config.domains.filter(d => d !== domain);
-                    config.disabled_domains = config.disabled_domains.filter(d => d !== domain);
+                    config.activeDomains = config.activeDomains.filter(d => d !== domain);
+                    config.blockedDomains = config.blockedDomains.filter(d => d !== domain);
 
                     await fetch(`${API_BASE_URL}/api/config`, {
                         method: 'POST',
