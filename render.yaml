@@ -12,5 +12,5 @@ services:
       - key: SESSION_SECRET
         generateValue: true
       - key: MONGODB_URI
-        sync: false # 这个变量需要手动设置
+        value: mongodb://atlas-sql-67eb72a77706f91cc1fe19ce-ws9cn.a.query.mongodb.net/domain_manager?ssl=true&authSource=admin
     healthCheckPath: /ping 
