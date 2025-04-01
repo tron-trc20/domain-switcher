@@ -12,5 +12,5 @@ services:
       - key: SESSION_SECRET
         generateValue: true
       - key: MONGODB_URI
-        value: mongodb+srv://domain_manager:domain_manager@atlas-sql-67eb72a77706f91cc1fe19ce-ws9cn.a.query.mongodb.net/domain_manager?retryWrites=true&w=majority
+        value: mongodb+srv://panzer:panzer@cluster0.yacqmwk.mongodb.net/domain_manager?retryWrites=true&w=majority&appName=Cluster0
     healthCheckPath: /ping 

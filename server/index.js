@@ -8,10 +8,12 @@ const Domain = require('./models/domain');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/domain-redirector';
+
+// 直接硬编码MongoDB连接字符串（生产环境中通常不推荐，但为了解决当前问题）
+const MONGODB_URI = 'mongodb+srv://panzer:panzer@cluster0.yacqmwk.mongodb.net/domain_manager?retryWrites=true&w=majority&appName=Cluster0';
 
 // 连接MongoDB
-mongoose.connect(MONGODB_URI)
+mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('MongoDB连接成功'))
   .catch(err => console.error('MongoDB连接失败:', err));
 
@@ -212,6 +214,22 @@ app.delete('/api/domains/:id', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('删除域名错误:', error);
     res.status(500).json({ error: '删除域名失败' });
+  }
+});
+
+// API - 公共获取第一个启用的域名（不需要登录）
+app.get('/api/first-domain', async (req, res) => {
+  try {
+    const enabledDomains = await Domain.find({ enabled: true }).sort({ createdAt: 1 });
+    
+    if (enabledDomains.length > 0) {
+      res.json({ url: enabledDomains[0].url });
+    } else {
+      res.json({ url: null, message: '没有可用的跳转域名' });
+    }
+  } catch (error) {
+    console.error('获取域名错误:', error);
+    res.status(500).json({ error: '获取域名失败' });
   }
 });
 
