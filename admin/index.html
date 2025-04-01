@@ -165,8 +165,8 @@
         const html = domains.map((domain, index) => {
           const statusClass = domain.enabled ? 'active' : 'disabled';
           const statusBtn = domain.enabled 
-            ? `<button class="btn btn-sm btn-warning disable-btn" data-id="${domain.id}">禁用</button>` 
-            : `<button class="btn btn-sm btn-success enable-btn" data-id="${domain.id}">启用</button>`;
+            ? `<button class="btn btn-sm btn-warning disable-btn" data-id="${domain._id}">禁用</button>` 
+            : `<button class="btn btn-sm btn-success enable-btn" data-id="${domain._id}">启用</button>`;
           
           return `
             <div class="domain-item ${statusClass}">
@@ -178,7 +178,7 @@
               </div>
               <div class="btn-group-sm">
                 ${statusBtn}
-                <button class="btn btn-sm btn-danger delete-btn" data-id="${domain.id}">删除</button>
+                <button class="btn btn-sm btn-danger delete-btn" data-id="${domain._id}">删除</button>
               </div>
             </div>
           `;

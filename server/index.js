@@ -267,6 +267,16 @@ app.put('/api/domains/:id', requireAuth, async (req, res) => {
       return res.status(400).json({ error: '缺少状态参数' });
     }
 
+    // 检查ID是否有效
+    if (!id || id === 'undefined') {
+      return res.status(400).json({ error: '无效的域名ID' });
+    }
+
+    // 检查ID是否为有效的MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: '域名ID格式不正确' });
+    }
+
     const domain = await Domain.findByIdAndUpdate(
       id,
       { enabled },
@@ -288,6 +298,17 @@ app.put('/api/domains/:id', requireAuth, async (req, res) => {
 app.delete('/api/domains/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // 检查ID是否有效
+    if (!id || id === 'undefined') {
+      return res.status(400).json({ error: '无效的域名ID' });
+    }
+
+    // 检查ID是否为有效的MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: '域名ID格式不正确' });
+    }
+    
     const domain = await Domain.findByIdAndDelete(id);
     
     if (!domain) {
