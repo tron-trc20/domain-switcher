@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>跳转中...</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #f5f5f5;
+      color: #333;
+    }
+    .loader {
+      border: 5px solid #f3f3f3;
+      border-top: 5px solid #3498db;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .container {
+      text-align: center;
+    }
+    .error-message {
+      color: #dc3545;
+      margin-top: 20px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="loader"></div>
+    <p>正在跳转，请稍候...</p>
+    <div id="errorMessage" class="error-message">
+      跳转超时，<a href="javascript:location.reload()">点击重试</a> 或 <a href="/admin">前往管理页面</a>
+    </div>
+  </div>
+  <script>
+    // 页面加载完成后尝试前端跳转
+    document.addEventListener('DOMContentLoaded', function() {
+      // 设置超时显示错误信息
+      setTimeout(function() {
+        document.getElementById('errorMessage').style.display = 'block';
+      }, 5000); // 5秒后显示错误信息
+      
+      // 从API获取域名列表并直接跳转
+      fetch('/api/domains')
+        .then(response => response.json())
+        .then(data => {
+          if (data && data.domains && Array.isArray(data.domains)) {
+            const enabledDomains = data.domains.filter(domain => domain.enabled);
+            if (enabledDomains.length > 0) {
+              console.log('前端准备跳转到:', enabledDomains[0].url);
+              window.location.href = enabledDomains[0].url;
+            } else {
+              console.error('没有启用的域名');
+              document.getElementById('errorMessage').textContent = '没有可用的跳转域名，请前往管理页面添加';
+              document.getElementById('errorMessage').style.display = 'block';
+            }
+          } else {
+            console.error('域名数据格式错误');
+            document.getElementById('errorMessage').style.display = 'block';
+          }
+        })
+        .catch(error => {
+          console.error('获取域名错误:', error);
+          document.getElementById('errorMessage').style.display = 'block';
+        });
+    });
+  </script>
+</body>
+</html> 

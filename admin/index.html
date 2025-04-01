@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>域名跳转管理后台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      padding-top: 20px;
+      background-color: #f8f9fa;
+    }
+    .container {
+      max-width: 1000px;
+      background-color: #fff;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+    }
+    .domain-list {
+      margin-top: 30px;
+    }
+    .domain-item {
+      padding: 15px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+      background-color: #f8f9fa;
+      border-left: 5px solid #6c757d;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .domain-item.active {
+      border-left-color: #28a745;
+    }
+    .domain-item.disabled {
+      border-left-color: #dc3545;
+      opacity: 0.7;
+    }
+    .btn-group-sm .btn {
+      margin-left: 5px;
+    }
+    .loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 200px;
+    }
+    .loader {
+      border: 5px solid #f3f3f3;
+      border-top: 5px solid #3498db;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .alert {
+      display: none;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="mb-4">域名跳转管理系统</h1>
+    
+    <div class="row">
+      <div class="col-md-6">
+        <div class="card mb-3">
+          <div class="card-header">添加单个域名</div>
+          <div class="card-body">
+            <form id="addDomainForm">
+              <div class="mb-3">
+                <label for="domainUrl" class="form-label">域名URL</label>
+                <input type="url" class="form-control" id="domainUrl" placeholder="https://example.com" required>
+              </div>
+              <button type="submit" class="btn btn-primary">添加</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">批量添加域名</div>
+          <div class="card-body">
+            <form id="bulkAddForm">
+              <div class="mb-3">
+                <label for="bulkDomains" class="form-label">域名URL列表</label>
+                <textarea class="form-control" id="bulkDomains" rows="4" placeholder="每行一个域名，例如：&#10;https://example1.com&#10;https://example2.com" required></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary">批量添加</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="alert alert-success" id="successAlert" role="alert"></div>
+    <div class="alert alert-danger" id="errorAlert" role="alert"></div>
+    
+    <h2 class="mt-4">域名列表</h2>
+    <div id="domainList" class="domain-list">
+      <div class="loading">
+        <div class="loader"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const API_URL = '/api/domains';
+      const domainList = document.getElementById('domainList');
+      const addDomainForm = document.getElementById('addDomainForm');
+      const bulkAddForm = document.getElementById('bulkAddForm');
+      const successAlert = document.getElementById('successAlert');
+      const errorAlert = document.getElementById('errorAlert');
+      
+      // 显示提示消息
+      function showAlert(type, message) {
+        const alert = type === 'success' ? successAlert : errorAlert;
+        alert.textContent = message;
+        alert.style.display = 'block';
+        
+        setTimeout(() => {
+          alert.style.display = 'none';
+        }, 3000);
+      }
+      
+      // 加载域名列表
+      async function loadDomains() {
+        try {
+          domainList.innerHTML = '<div class="loading"><div class="loader"></div></div>';
+          
+          const response = await fetch(API_URL);
+          if (!response.ok) {
+            throw new Error('获取域名列表失败');
+          }
+          
+          const data = await response.json();
+          if (!data.domains || !Array.isArray(data.domains)) {
+            throw new Error('域名数据格式错误');
+          }
+          
+          renderDomainList(data.domains);
+        } catch (error) {
+          console.error('加载域名错误:', error);
+          domainList.innerHTML = `<div class="alert alert-danger">加载域名失败: ${error.message}</div>`;
+        }
+      }
+      
+      // 渲染域名列表
+      function renderDomainList(domains) {
+        if (domains.length === 0) {
+          domainList.innerHTML = '<div class="alert alert-info">暂无域名数据</div>';
+          return;
+        }
+        
+        const html = domains.map((domain, index) => {
+          const statusClass = domain.enabled ? 'active' : 'disabled';
+          const statusBtn = domain.enabled 
+            ? `<button class="btn btn-sm btn-warning disable-btn" data-id="${domain.id}">禁用</button>` 
+            : `<button class="btn btn-sm btn-success enable-btn" data-id="${domain.id}">启用</button>`;
+          
+          return `
+            <div class="domain-item ${statusClass}">
+              <div class="domain-info">
+                <strong>${index + 1}. ${domain.url}</strong>
+                <span class="badge ${domain.enabled ? 'bg-success' : 'bg-danger'} ms-2">
+                  ${domain.enabled ? '启用' : '禁用'}
+                </span>
+              </div>
+              <div class="btn-group-sm">
+                ${statusBtn}
+                <button class="btn btn-sm btn-danger delete-btn" data-id="${domain.id}">删除</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+        
+        domainList.innerHTML = html;
+        
+        // 添加事件监听器
+        document.querySelectorAll('.enable-btn').forEach(btn => {
+          btn.addEventListener('click', () => updateDomainStatus(btn.dataset.id, true));
+        });
+        
+        document.querySelectorAll('.disable-btn').forEach(btn => {
+          btn.addEventListener('click', () => updateDomainStatus(btn.dataset.id, false));
+        });
+        
+        document.querySelectorAll('.delete-btn').forEach(btn => {
+          btn.addEventListener('click', () => deleteDomain(btn.dataset.id));
+        });
+      }
+      
+      // 更新域名状态
+      async function updateDomainStatus(id, enabled) {
+        try {
+          const response = await fetch(`${API_URL}/${id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ enabled })
+          });
+          
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || '更新域名状态失败');
+          }
+          
+          showAlert('success', `域名已${enabled ? '启用' : '禁用'}`);
+          loadDomains();
+        } catch (error) {
+          console.error('更新域名状态错误:', error);
+          showAlert('error', error.message);
+        }
+      }
+      
+      // 删除域名
+      async function deleteDomain(id) {
+        if (!confirm('确定要删除这个域名吗？')) {
+          return;
+        }
+        
+        try {
+          const response = await fetch(`${API_URL}/${id}`, {
+            method: 'DELETE'
+          });
+          
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || '删除域名失败');
+          }
+          
+          showAlert('success', '域名已删除');
+          loadDomains();
+        } catch (error) {
+          console.error('删除域名错误:', error);
+          showAlert('error', error.message);
+        }
+      }
+      
+      // 添加单个域名
+      addDomainForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const domainUrl = document.getElementById('domainUrl').value.trim();
+        
+        if (!domainUrl) {
+          showAlert('error', '请输入有效的域名URL');
+          return;
+        }
+        
+        try {
+          const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ url: domainUrl })
+          });
+          
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || '添加域名失败');
+          }
+          
+          showAlert('success', '域名添加成功');
+          addDomainForm.reset();
+          loadDomains();
+        } catch (error) {
+          console.error('添加域名错误:', error);
+          showAlert('error', error.message);
+        }
+      });
+      
+      // 批量添加域名
+      bulkAddForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const bulkDomains = document.getElementById('bulkDomains').value.trim();
+        
+        if (!bulkDomains) {
+          showAlert('error', '请输入域名列表');
+          return;
+        }
+        
+        const urls = bulkDomains.split('\n')
+          .map(line => line.trim())
+          .filter(line => line.length > 0);
+        
+        if (urls.length === 0) {
+          showAlert('error', '没有有效的域名');
+          return;
+        }
+        
+        try {
+          const response = await fetch(`${API_URL}/batch`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ urls })
+          });
+          
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || '批量添加域名失败');
+          }
+          
+          const result = await response.json();
+          showAlert('success', `成功添加${result.domains.length}个域名`);
+          bulkAddForm.reset();
+          loadDomains();
+        } catch (error) {
+          console.error('批量添加域名错误:', error);
+          showAlert('error', error.message);
+        }
+      });
+      
+      // 初始加载
+      loadDomains();
+    });
+  </script>
+</body>
+</html> 

@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: domain-redirector
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ADMIN_PASSWORD
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false # 这个变量需要手动设置
+    healthCheckPath: /ping 
